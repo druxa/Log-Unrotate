@@ -31,12 +31,12 @@ my $pos = shift @ARGV;
 my $log = shift @ARGV; # may be undefined
 
 my $reader = Log::Unrotate->new({
-  LogFile => $log,
-  PosFile => $pos,
+  log => $log,
+  pos => $pos,
 });
 
 my $processed = 0;
-while (my $line = $reader->readline()) {
+while (my $line = $reader->read()) {
     print $line;
     $processed++;
     last if $limit and $processed >= $limit;

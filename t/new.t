@@ -12,13 +12,13 @@ sub new ($;$) {
     my ($class, $props) = @_;
     $props ||= {};
     my $self = {
-        LogFile => "tfiles/test.log",
+        log => "tfiles/test.log",
         %$props,
     };
 
-    unless ($self->{PosFile}) {
-        $self->{PosFile} = $self->{LogFile};
-        $self->{PosFile} =~ s/\.log$/.pos/ or $self->{PosFile} =~ s/$/.pos/;
+    unless ($self->{pos}) {
+        $self->{pos} = $self->{log};
+        $self->{pos} =~ s/\.log$/.pos/ or $self->{pos} =~ s/$/.pos/;
     }
 
     bless $self => $class;
@@ -26,14 +26,14 @@ sub new ($;$) {
 
 sub logfile ($;$) {
     my ($self, $n) = @_;
-    my $log = $self->{LogFile};
+    my $log = $self->{log};
     $log .= ".$n" if $n;
     return $log;
 }
 
 sub posfile ($) {
     my ($self) = @_;
-    return $self->{PosFile};
+    return $self->{pos};
 }
 
 sub write_raw ($$;$) {
@@ -57,7 +57,7 @@ sub touch ($;$) {
 
 sub rotate ($) {
     my ($self) = @_;
-    my @logs = sort { $b <=> $a } map { /\.(\d+)$/ and $1 or 0 } glob("$self->{LogFile}*");
+    my @logs = sort { $b <=> $a } map { /\.(\d+)$/ and $1 or 0 } glob("$self->{log}*");
     for (@logs) {
         xsystem("mv " . $self->logfile($_) . " " . $self->logfile($_ + 1));
     }
@@ -72,7 +72,7 @@ sub remove ($;$) {
 
 sub clear ($) {
     my ($self) = @_;
-    xsystem("rm -f $self->{LogFile}* $self->{PosFile}");
+    xsystem("rm -f $self->{log}* $self->{pos}");
 }
 
 sub DESTROY ($) {
@@ -88,7 +88,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 52;
+use Test::More tests => 58;
 use Test::Exception;
 use IO::Handle;
 use t::Utils;
@@ -104,8 +104,8 @@ sub reader ($;$) {
     $opts ||= {};
 
     return new Log::Unrotate({
-        LogFile => $writer->logfile(),
-        PosFile => $writer->posfile(),
+        log => $writer->logfile(),
+        pos => $writer->posfile(),
         %$opts,
     });
 }
@@ -115,7 +115,7 @@ sub reader ($;$) {
     my $writer = new LogWriter;
     my $reader = reader($writer);
     lives_ok(sub { $reader->position() }, "Backstep successful on missing log");
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, undef, "Reading from a missing file");
     $reader->commit();
     ok(not (-e $writer->posfile()), "Fake commit when missing logfile");
@@ -127,31 +127,31 @@ sub reader ($;$) {
     $writer->touch();
     my $reader = reader($writer);
     lives_ok(sub { $reader->position() }, "Backstep successful on missing previous log");
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, undef, "Reading from an empty file");
 }
 
-# simple readline (2)
+# simple read (2)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test1\n", "Read one line from file");
-    $line = $reader->readline;
+    $line = $reader->read;
     is($line, undef, "Reading at the end of file");
 }
 
-# commit and readline (1)
+# commit and read (1)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->write("test2");
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2\n", "Read second line after commit");
 }
 
@@ -160,13 +160,13 @@ sub reader ($;$) {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $reader = reader($writer);
-    lives_ok(sub { $reader->commit() }, "Commit without a preceding readline");
+    lives_ok(sub { $reader->commit() }, "Commit without a preceding read");
     $writer->write("test2");
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2\n", "Read second line after commit twice");
 }
 
@@ -177,49 +177,49 @@ sub reader ($;$) {
     $writer->write("test2");
     $writer->write("test3");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     my $pos = $reader->position();
-    $reader->readline();
+    $reader->read();
     $reader->commit($pos);
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2\n", "Read after commiting nondefault position");
 }
 
-# readline and rotation (3)
+# read and rotation (3)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
     $writer->write("test2");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->rotate();
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2\n", "Read line from a rotated file");
-    $line = $reader->readline();
+    $line = $reader->read();
     is($line, undef, "Reading at the end of a rotated file");
     $reader->commit();
     $writer->write("test3");
     $reader = reader($writer);
-    $line = $reader->readline();
+    $line = $reader->read();
     is($line, "test3\n", "Go on reading after a rotated file is over");
 
 }
 
-# commit, rotate and readline (2)
+# commit, rotate and read (2)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
     $writer->write("test2");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->rotate();
     $writer->write("test3");
     lives_ok( sub { $reader = reader($writer) }, "Commited state successfully found after rotation");
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2\n", "Read from commited state after rotation");
 }
 
@@ -228,7 +228,7 @@ sub reader ($;$) {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->rotate();
     $writer->touch();
@@ -237,7 +237,7 @@ sub reader ($;$) {
     $writer->rotate();
     $writer->write("test2");
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2\n", "Empty files skipped");
 }
 
@@ -246,70 +246,70 @@ sub reader ($;$) {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->rotate();
     $writer->touch();
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, undef, "Empty line from empty file");
     $reader->commit();
     $writer->write("test2");
     $writer->rotate();
     $writer->write("test3");
     $reader = reader($writer);
-    $line = $reader->readline();
+    $line = $reader->read();
     is($line, "test2\n", "Position 0 handled properly");
 }
 
-# CheckInode flag (2)
+# check_inode flag (2)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->rotate();
     $writer->write("test1");
     $writer->rotate();
     $writer->write("test2");
-    $reader = reader($writer, {CheckInode => 1});
-    my $line = $reader->readline();
-    is($line, "test1\n", "CheckInode saves from LastLine collision");
+    $reader = reader($writer, {check_inode => 1});
+    my $line = $reader->read();
+    is($line, "test1\n", "check_inode saves from LastLine collision");
 
     $writer->clear();
     $writer->write("test1");
     $writer->write("test2");
     $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     my $log = $writer->logfile();
     xsystem("cp $log $log.1 && mv $log.1 $log"); # change inode
-    $reader = reader($writer, {CheckInode => 0});
-    $line = $reader->readline();
-    is($line, "test2\n", "Skip inode check when CheckInode is off");
+    $reader = reader($writer, {check_inode => 0});
+    $line = $reader->read();
+    is($line, "test2\n", "Skip inode check when check_inode is off");
 }
 
 
-# EndPos => "fixed" (1)
+# end => "fixed" (1)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
-    my $reader = reader($writer, {EndPos => "fixed"});
-    $reader->readline();
+    my $reader = reader($writer, {end => "fixed"});
+    $reader->read();
     $writer->write("test2");
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, undef, "Ignore what was written to the log after it was opened");
 }
 
-# EndPos => "future" (1)
+# end => "future" (1)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
-    my $reader = reader($writer, {EndPos => "future"});
-    $reader->readline();
+    my $reader = reader($writer, {end => "future"});
+    $reader->read();
     $writer->write("test2");
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2\n", "Read what was written to the log after it was opened");
 }
 
@@ -318,33 +318,33 @@ sub reader ($;$) {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->write_raw("test2");
     $writer->rotate();
     $writer->write("test3");
     $writer->write_raw("test4");
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test2", "Read incomplete lines from rotated logs");
-    $reader->readline();
-    $line = $reader->readline();
+    $reader->read();
+    $line = $reader->read();
     is($line, undef, "Ignore incomplete line at the end of the last log");
     $reader->commit();
     $writer->write_raw("\n");
     $reader = reader($writer);
-    $line = $reader->readline();
+    $line = $reader->read();
     is($line, "test4\n", "Correctly backstep after meeting an incomplete line");
     $reader->commit();
     $writer->write_raw("test5");
     $writer->rotate();
     $writer->touch();
     $reader = reader($writer);
-    $line = $reader->readline();
+    $line = $reader->read();
     is($line, undef, "Ignore incomplete line at the end of the last non-empty log");
     $writer->write_raw("\n", 1);
     $reader = reader($writer);
-    $line = $reader->readline();
+    $line = $reader->read();
     is($line, "test5\n", "Correctly backstep after meeting an incomplete line in an rotated log");
 }
 
@@ -353,7 +353,7 @@ sub reader ($;$) {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->rotate();
     $writer->write("test2");
@@ -365,7 +365,7 @@ sub reader ($;$) {
     $writer->clear();
     $writer->write("test1");
     $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
 
     $writer->rotate();
@@ -373,7 +373,7 @@ sub reader ($;$) {
     $writer->rotate();
     $writer->write("test1");
     $writer->remove(2);
-    throws_ok(sub {$reader = reader($writer, {CheckInode => 1})}, qr/unable to find/, "Die if proper Inode is missing");
+    throws_ok(sub {$reader = reader($writer, {check_inode => 1})}, qr/unable to find/, "Die if proper Inode is missing");
 }
 
 # position() issues (4)
@@ -382,26 +382,26 @@ sub reader ($;$) {
     $writer->write("test1");
     $writer->write("test2");
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->rotate();
     $writer->touch();
     $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     is_deeply($reader->position(), $reader->position(), "Call to position() does not spoil self");
 
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->write("test3", 1);
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line, "test3\n", "A rotated log may be updated till the new log is empty");
 
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     $writer->write("test4");
     $reader = reader($writer);
-    $line = $reader->readline();
+    $line = $reader->read();
     is($line, "test4\n", "Calculate position correctly when read nothing");
     $reader->commit();
 
@@ -409,29 +409,29 @@ sub reader ($;$) {
     $reader->commit();
     $writer->write("test5");
     $reader = reader($writer);
-    $line = $reader->readline();
-    is($line, "test5\n", "Calculate position correctly without a call to readline()");
+    $line = $reader->read();
+    is($line, "test5\n", "Calculate position correctly without a call to read()");
 }
 
-# StartPos flag (3)
+# start flag (3)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
     $writer->rotate();
     $writer->write("test2");
-    my $reader = reader($writer, {StartPos => "begin"});
-    my $line = $reader->readline();
-    is($line, "test2\n", "StartPos => 'begin' interpreted properly");
-    $reader = reader($writer, {StartPos => "first"});
-    $line = $reader->readline();
-    is($line, "test1\n", "StartPos => 'first' interpreted properly");
-    $reader = reader($writer, {StartPos => "end", EndPos => "future"});
+    my $reader = reader($writer, {start => "begin"});
+    my $line = $reader->read();
+    is($line, "test2\n", "start => 'begin' interpreted properly");
+    $reader = reader($writer, {start => "first"});
+    $line = $reader->read();
+    is($line, "test1\n", "start => 'first' interpreted properly");
+    $reader = reader($writer, {start => "end", end => "future"});
     $writer->write("test3");
-    $line = $reader->readline();
-    is($line, "test3\n", "StartPos => 'end' interpreted properly");
+    $line = $reader->read();
+    is($line, "test3\n", "start => 'end' interpreted properly");
 }
 
-# showlag (2)
+# lag (2)
 {
     my $writer = new LogWriter;
     $writer->write("test0");
@@ -441,8 +441,8 @@ sub reader ($;$) {
     $writer->write("test4");
     $writer->write("test5");
     my $reader = reader($writer);
-    $reader->readline();
-    is($reader->showlag(), 5*6, "showlag() is correct on a single log");
+    $reader->read();
+    is($reader->lag(), 5*6, "lag() is correct on a single log");
     $reader->commit();
     $writer->rotate();
     $writer->write("test6");
@@ -450,7 +450,7 @@ sub reader ($;$) {
     $writer->rotate();
     $writer->write("test8");
     $reader = reader($writer);
-    is($reader->showlag(), 8*6, "showlag() is correct on a multiple logs");
+    is($reader->lag(), 8*6, "lag() is correct on a multiple logs");
 }
 
 # exceptions (4)
@@ -460,12 +460,12 @@ sub reader ($;$) {
     $writer->write("test2");
     $writer->write("test3");
     my $reader = reader($writer);
-    $reader->readline();
-    $reader->readline();
+    $reader->read();
+    $reader->read();
     $reader->commit();
     my $logfile = $writer->logfile();
     xsystem("echo test4 >$logfile");
-    throws_ok(sub {$reader = reader($writer, {CheckInode => 1, CheckLastLine => 0})}, qr/unable to find/, "Check for too big Position");
+    throws_ok(sub {$reader = reader($writer, {check_inode => 1, check_lastline => 0})}, qr/unable to find/, "Check for too big Position");
     my $posfile = $writer->posfile();
     xsystem("echo 'LastLine: test1' >$posfile");
     throws_ok(sub {$reader = reader($writer)}, qr/missing/, "Check .pos file mandatory fields");
@@ -475,25 +475,37 @@ sub reader ($;$) {
     throws_ok(sub {$reader = reader($writer)}, qr/missing/, "Check .pos file is not empty");
 }
 
-# PosFile => "-" (1)
+# constructor (6)
+{
+    my $writer = new LogWriter;
+    throws_ok(sub { reader($writer, { start => 'blah' }) }, qr/unknown start value/, 'constructor checks start value');
+    throws_ok(sub { reader($writer, { end => 'blah' }) }, qr/unknown end value/, 'constructor checks end value');
+    throws_ok(sub { reader($writer, { lock => 'blah' }) }, qr/unknown lock value/, 'constructor checks lock value');
+    throws_ok(sub { reader($writer, { filter => 'blah' }) }, qr/filter should be subroutine ref/, 'constructor checks filter value');
+    throws_ok(sub { reader($writer, { check_inode => 0, check_lastline => 0 }) }, qr/either check_inode or check_lastline/, 'constructor checks that one of check flags is on');
+
+    throws_ok(sub { Log::Unrotate->new({ pos => '-' }) }, qr/Position file .* not found and log not specified/, 'constructor croaks if not enough parameters specified');
+}
+
+# pos => "-" (1)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
-    my $reader = reader($writer, {PosFile => "-"});
-    $reader->readline();
+    my $reader = reader($writer, {pos => "-"});
+    $reader->read();
     $reader->commit();
-    $reader = reader($writer, {PosFile => "-"});
-    my $line = $reader->readline();
-    is($line, "test1\n", 'PosFile "-" ignores commits');
+    $reader = reader($writer, {pos => "-"});
+    my $line = $reader->read();
+    is($line, "test1\n", 'pos "-" ignores commits');
 }
 
-# LogFile => "-" (1)
+# log => "-" (1)
 {
     my $test1 = xqx(q#echo test1 | perl -Ilib -e '
     use Log::Unrotate;
-    $reader = new Log::Unrotate({PosFile => "-", LogFile => "-", EndPos=>"future"});
-    print $reader->readline()'#);
-    is ($test1, "test1\n", 'LogFile => "-" reads stdin');
+    $reader = new Log::Unrotate({pos => "-", log => "-", end => "future"});
+    print $reader->read()'#);
+    is ($test1, "test1\n", 'log => "-" reads stdin');
 }
 
 # loooooong lines (2)
@@ -502,13 +514,13 @@ sub reader ($;$) {
     $writer->write("test1"x10000);
     $writer->write("test2"x10000);
     my $reader = reader($writer);
-    $reader->readline();
+    $reader->read();
     $reader->commit();
     my $posfile = $writer->posfile();
     my @posstat = stat $posfile;
     cmp_ok($posstat[7], "<", 1000, "LastLine is trancated to a reasonable size");
     $reader = reader($writer);
-    my $line = $reader->readline();
+    my $line = $reader->read();
     is($line =~ s/test2//g, 10000, "Long lines are read correctly");
 }
 
@@ -526,11 +538,11 @@ sub reader ($;$) {
         return {something => 'special'} if $line eq 'special';
         return $line * 2;
     };
-    my $reader = reader($writer, {Filter => $filter});
-    my $line = $reader->readline();
-    is($line, "246", 'Filter works');
-    throws_ok(sub {$reader->readline()}, qr/^!!!111/, 'Filter exceptions are passed through');
-    is($reader->readline(), "10", "Filter exceptions do not break reading if catched");
-    is($reader->readline()->{something}, "special", "Filter can return hashref");
+    my $reader = reader($writer, {filter => $filter});
+    my $line = $reader->read();
+    is($line, "246", 'filter works');
+    throws_ok(sub {$reader->read()}, qr/^!!!111/, 'filter exceptions are passed through');
+    is($reader->read(), "10", "filter exceptions do not break reading if catched");
+    is($reader->read()->{something}, "special", "filter can return hashref");
 }
 
