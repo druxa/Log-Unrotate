@@ -1,5 +1,6 @@
 Changes
 MANIFEST
+MANIFEST.SKIP
 README
 Makefile.PL
 lib/Log/Unrotate.pm

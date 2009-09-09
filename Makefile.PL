@@ -10,9 +10,8 @@ WriteMakefile(
         'Test::More' => 0,
         'Test::Exception' => 0,
     },
-    LICENSE => 'perl',
     AUTHOR         => 'Andrei Mishchenko <druxa@yandex-team.ru>',
     EXE_FILES      => ['bin/unrotate'],
-    clean => { FILES => 'tfiles' },
+    clean => { FILES => ['tfiles', 'cover_db'] },
 );
 
