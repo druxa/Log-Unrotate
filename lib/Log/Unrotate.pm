@@ -36,9 +36,9 @@ our $VERSION = '1.00';
 
 =head1 DESCRIPTION
 
-The C<Log::Unrotate> is a class that allows incremental reading of a log file correctly handling logrotates.
+The C<Log::Unrotate> is a class that implements incremental and transparent reading of a log file which correctly handles logrotates.
 
-The logrotate config should not use the "compress" option to make that function properly.
+It tries really hard to never skip any data from logs. If it's not sure about what to do, it fails, and you should either fix your position file manually, or remove it completely.
 
 =cut
 
@@ -72,73 +72,69 @@ our %_end_values = map { $_ => 1 } qw(fixed future);
 
 =cut
 
-=item C<< new >>
+=item B<< new($params) >>
 
 Creates new unrotate object.
 
 =over
 
-=item B<pos>
+=item I<pos>
 
 Name of file to store log reading position. Will be created automatically if missing.
 
 Value '-' means not use position file. I.e., pretend it doesn't exist at start and ignore commit calls.
 
-=item B<log>
+=item I<log>
 
 Name of log file. Value '-' means standard input stream.
 
-=item B<start>
+=item I<start>
 
 Describes behavior when position file doesn't exist. Allowed values: C<begin> (default), C<end>, C<first>.
 
-=over 3
+=over 4
 
 =item *
 
-When B<start> is C<begin>, we'll read current B<log> from beginning.
+When I<start> is C<begin>, we'll read current I<log> from beginning.
 
 =item *
 
-When B<start> is C<end>, we'll put current position in B<log> at the end. (useful for big files when some new script don't need to read everything).
+When I<start> is C<end>, we'll put current position in C<log> at the end (useful for big files when some new script don't need to read everything).
 
 =item *
 
-When B<start> is C<first>, C<Unrotate> will find oldest log file and read everything.
+When I<start> is C<first>, C<Log::Unrotate> will find oldest log file and read everything.
 
 =back
 
-=item B<end>
+=item I<end>
 
 Describes behavior when the log is asynchronously appended while read. Allowed values: C<fixed> (default), C<future>.
 
-=over 3
+=over 4
 
-=item *
+=item * When I<end> is C<fixed>, the log is read up to the position it had when the reader object was created.
 
-When B<end> is C<fixed>, the log is read up to the position it had when the reader object was created.
-
-=item *
-
-When B<end> is C<future>, it allows reading the part of the log that was appended after the reader creation. (useful for reading from stdin).
+=item * When I<end> is C<future>, it allows reading the part of the log that was appended after the reader creation (useful for reading from stdin).
 
 =back
 
-=item B<lock>
+=item I<lock>
 
 Describes locking behaviour. Allowed values: C<none> (default), C<blocking>, C<nonblocking>.
 
-=item B<check_inode>
+=item I<check_inode>
 
 This flag is set by default. It enables inode checks when detecting log rotations. This option should be disabled when retrieving logs via rsync or some other way which modifies inodes.
 
-=item B<check_lastline>
+=item I<check_lastline>
 
 This flag is set by default. It enables content checks when detecting log rotations. There is actually no reason to disable this option.
 
-=item B<filter>
+=item I<filter>
 
-You can specify subroutine ref here to filter each line. If subroutine will throw exception, it will be passed through to read() caller. Subroutine can transform line to any scalar, including hashrefs or objects.
+You can specify subroutine ref here to filter each line. If subroutine will throw exception, it will be passed through to B<read()> caller. Subroutine can transform line to any scalar, including hashrefs or objects.
 
 =back
 
@@ -345,9 +341,9 @@ sub _next ($)
 
 ################################################# Public methods ######################################################
 
-=item C<< $self->read() >>
+=item B<< read() >>
 
-Read a string from the file B<log>.
+Read a string from the file I<log>.
 
 =cut
 sub read($)
@@ -378,9 +374,9 @@ sub read($)
     return $line;
 }
 
-=item C<< $self->position() >>
+=item B<< position() >>
 
-Get your current position in B<log> as an object passible to commit.
+Get your current position in I<log> as an object passible to commit.
 
 =cut
 sub position($)
@@ -397,9 +393,9 @@ sub position($)
     return $pos;
 }
 
-=item C<< $self->commit(;$) >>
+=item B<< commit(;$) >>
 
-Save current position in the file B<pos>. You can also save some other position, previosly taken with C<position>.
+Save current position in the file I<pos>. You can also save some other position, previosly taken with B<position>.
 
 Position file gets commited using temporary file, so it'll not be lost if disk space is depleted.
 
@@ -430,7 +426,7 @@ sub commit($;$)
     $fh->unlink_on_destroy(0);
 }
 
-=item C<< $self->lag() >>
+=item B<< lag() >>
 
 Get the lag between current position and the end of the log in bytes.
 
@@ -463,17 +459,33 @@ sub DESTROY {
 
 =back
 
+=head1 BUGS & CAVEATS
+
+To find and open correct log is a race-condition-prone task.
+
+This module was used in production environment for 3 years, and many bugs were found and fixed. The only known case when position file can become broken is when logrotate is invoked twice in *very* short amount of time, which should never be a case.
+
+Don't set I<check_inode> option on virtual hosts, especially on openvz-based ones. When host migrates, inodes of files will change and your position file will become broken.
+
+The logrotate config should not use the "compress" option to make that module function properly. If you need to compress logs, set "delaycompress" option too.
+
 =head1 AUTHORS
 
-Andrei Mishchenko C<druxa@yandex-team.ru>.
-
-Currently maintained by Vyacheslav Matjukhin C<mmcleric@yandex-team.ru>.
+Andrei Mishchenko C<druxa@yandex-team.ru>, Vyacheslav Matjukhin C<mmcleric@yandex-team.ru>.
 
 =head1 SEE ALSO
 
 L<File::LogReader> - another implementation of the same idea.
 
 L<unrotate(1)> - console script to unrotate logs.
+
+=head1 COPYRIGHT
+
+Copyright (c) 2006-2009 Yandex LTD. All rights reserved.
+
+This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+See <http://www.perl.com/perl/misc/Artistic.html>
 
 =cut
 
