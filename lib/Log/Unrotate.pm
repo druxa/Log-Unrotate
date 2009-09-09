@@ -256,7 +256,7 @@ sub _reopen ($$;$$)
 
     my $log = $self->_log_file();
 
-    if (open my $FILE, '<', $log) {
+    if (open my $FILE, "<$log") {
 
         my @stat = stat $FILE;
         return 0 if $from == 0 and $stat[7] < $position;
