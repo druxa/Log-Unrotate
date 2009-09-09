@@ -114,15 +114,31 @@ Describes behavior when the log is asynchronously appended while read. Allowed v
 
 =over 4
 
-=item * When I<end> is C<fixed>, the log is read up to the position it had when the reader object was created.
+=item *
 
-=item * When I<end> is C<future>, it allows reading the part of the log that was appended after the reader creation (useful for reading from stdin).
+When I<end> is C<fixed>, the log is read up to the position it had when the reader object was created.
+
+=item *
+
+When I<end> is C<future>, it allows reading the part of the log that was appended after the reader creation (useful for reading from stdin).
 
 =back
 
 =item I<lock>
 
 Describes locking behaviour. Allowed values: C<none> (default), C<blocking>, C<nonblocking>.
+
+=over 4
+
+=item *
+
+When I<lock> is C<blocking>, lock named I<pos>.lock will be acquired in blocking mode.
+
+=item *
+
+When I<lock> is C<nonblocking>, lock named I<pos>.lock will be acquired in nonblocking mode; if lock file is already locked, exception will be thrown.
+
+=back
 
 =item I<check_inode>
 
