@@ -8,3 +8,4 @@ Makefile\.old
 pm_to_blib
 MANIFEST\.bak
 cover_db
+Log-Unrotate-.*

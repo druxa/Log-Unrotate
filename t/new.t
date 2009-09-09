@@ -88,7 +88,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 58;
+use Test::More tests => 69;
 use Test::Exception;
 use IO::Handle;
 use t::Utils;
@@ -129,6 +129,23 @@ sub reader ($;$) {
     lives_ok(sub { $reader->position() }, "Backstep successful on missing previous log");
     my $line = $reader->read();
     is($line, undef, "Reading from an empty file");
+}
+
+# open failures (2)
+{
+    my $writer = new LogWriter;
+    $writer->write('test1');
+    chmod 0000, $writer->logfile or die "chmod failed: $!";
+    throws_ok(sub { reader($writer) }, qr/exists but is unreadable/, 'constructor fails when log is unreadable');
+    undef $writer;
+
+    $writer = new LogWriter;
+    $writer->write('test1');
+    my $reader = reader($writer);
+    $reader->commit;
+
+    chmod 0000, $writer->posfile or die "chmod failed: $!";
+    throws_ok(sub { reader($writer) }, qr/Can't open '.*.pos'/, 'constructor fails when pos is unreadable');
 }
 
 # simple read (2)
@@ -544,5 +561,36 @@ sub reader ($;$) {
     throws_ok(sub {$reader->read()}, qr/^!!!111/, 'filter exceptions are passed through');
     is($reader->read(), "10", "filter exceptions do not break reading if catched");
     is($reader->read()->{something}, "special", "filter can return hashref");
+}
+
+# locks (5)
+{
+    my $writer = new LogWriter();
+    my $reader = reader($writer, { lock => 'blocking' });
+    lives_ok(sub { reader($writer) }, 'constructing second writer without locks lives');
+    lives_ok(sub { reader($writer, { lock => 'none' }) }, "constructing second writer without locks, explicitly specifying that we don't need lock");
+    dies_ok(sub { reader($writer, { lock => 'nonblocking' }) }, 'constructing second writer with lock dies');
+
+    undef $reader;
+    lives_ok(sub { reader($writer, { lock => 'nonblocking' }) }, 'destructor releases lock');
+
+    chmod 0000, 'tfiles/test.pos.lock' or die "can't chmod lock file: $!";
+    throws_ok(sub { reader($writer, { lock => 'nonblocking' }) }, qr/Can't open /, "constructor fails when lock can't be written");
+}
+
+# caching log in pos (4)
+{
+    my $writer = new LogWriter();
+    $writer->write('abc');
+    my $reader = reader($writer);
+    $reader->commit;
+    xsystem('cp', $writer->logfile, "tfiles/another.log");
+    lives_ok(sub { reader($writer, { log => 'tfiles/another.log' }) }, "without check_log, it's ok to change log file");
+    throws_ok(sub { reader($writer, { log => 'tfiles/another.log', check_log => 1 }) }, qr/logfile mismatch/, "with check_log, it's not ok");
+
+    lives_ok(sub { Log::Unrotate->new({ pos => $writer->posfile }) }, 'loading logfile from posfile if log not specified');
+    xsystem("grep -v 'logfile:' ".$writer->posfile." >tfiles/new.pos");
+    rename('tfiles/new.pos', $writer->posfile);
+    throws_ok(sub { Log::Unrotate->new({ pos => $writer->posfile }) }, qr/log not specified/, "constructor dies if no log specified and pos file doesn't contain log name");
 }
 

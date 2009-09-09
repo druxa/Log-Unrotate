@@ -44,6 +44,7 @@ The logrotate config should not use the "compress" option to make that function 
 
 use Carp;
 
+use IO::Handle;
 use File::Basename;
 use File::Temp;
 use Digest::MD5 qw(md5_hex);
@@ -123,6 +124,10 @@ When B<end> is C<future>, it allows reading the part of the log that was appende
 
 =back
 
+=item B<lock>
+
+Describes locking behaviour. Allowed values: C<none> (default), C<blocking>, C<nonblocking>.
+
 =item B<check_inode>
 
 This flag is set by default. It enables inode checks when detecting log rotations. This option should be disabled when retrieving logs via rsync or some other way which modifies inodes.
@@ -165,12 +170,15 @@ sub new ($$)
 
     if ($self->{pos} ne '-' and $self->{lock} ne 'none') {
         # locks
-        open $self->{lock_fh}, '>>', "$self->{pos}.lock" or die "Can't open $self->{pos}.lock: $!";
+        unless (open $self->{lock_fh}, '>>', "$self->{pos}.lock") {
+            delete $self->{lock_fh};
+            croak "Can't open $self->{pos}.lock: $!";
+        }
         if ($self->{lock} eq 'blocking') {
-            flock $self->{lock_fh}, LOCK_EX or die "Failed to obtain lock: $!";
+            flock $self->{lock_fh}, LOCK_EX or croak "Failed to obtain lock: $!";
         }
         elsif ($self->{lock} eq 'nonblocking') {
-            flock $self->{lock_fh}, LOCK_EX | LOCK_NB or die "Failed to obtain lock: $!";
+            flock $self->{lock_fh}, LOCK_EX | LOCK_NB or croak "Failed to obtain lock: $!";
         }
     }
 
@@ -406,10 +414,17 @@ sub commit($;$)
 
     my $fh = File::Temp->new(DIR => dirname($self->{pos}));
 
-    print {$fh} ("logfile: $self->{log}\n") or die "print failed:  $!";
-    print {$fh} ("position: $pos->{Position}\n") or die "print failed: $!";
-    print {$fh} ("inode: $pos->{Inode}\n") or die "print failed: $!" if $pos->{Inode};
-    print {$fh} ("lastline: $pos->{LastLine}\n") or die "print failed: $!" if $pos->{LastLine};
+    $fh->print("logfile: $self->{log}\n");
+    $fh->print("position: $pos->{Position}\n");
+    if ($pos->{Inode}) {
+        $fh->print("inode: $pos->{Inode}\n");
+    }
+    if ($pos->{LastLine}) {
+        $fh->print("lastline: $pos->{LastLine}\n");
+    }
+    if ($fh->error) {
+        die 'print into '.$fh->filename.' failed';
+    }
 
     rename($fh->filename, $self->{pos}) or die "Failed to commit pos $self->{pos}: $!";
     $fh->unlink_on_destroy(0);
@@ -448,9 +463,17 @@ sub DESTROY {
 
 =back
 
+=head1 AUTHORS
+
+Andrei Mishchenko C<druxa@yandex-team.ru>.
+
+Currently maintained by Vyacheslav Matjukhin C<mmcleric@yandex-team.ru>.
+
 =head1 SEE ALSO
 
 L<File::LogReader> - another implementation of the same idea.
+
+L<unrotate(1)> - console script to unrotate logs.
 
 =cut
 

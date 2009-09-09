@@ -44,8 +44,12 @@ while (my $line = $reader->read()) {
 
 $reader->commit() if $commit;
 
-=head1 AUTHOR
+=head1 AUTHORS
 
-Vyacheslav Matjukhin <mmcleric@yandex-team.ru>
+Andrei Mishchenko C<druxa@yandex-team.ru>, Vyacheslav Matjukhin C<mmcleric@yandex-team.ru>.
+
+=head1 SEE ALSO
+
+L<Log::Unrotate>
 
 =cut
