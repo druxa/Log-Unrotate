@@ -1,20 +1,12 @@
 #!/usr/bin/perl
-# vim: syn=perl
+
 use strict;
 use warnings;
 
-use Yandex::Logger ({Path => '-', Text => q{
-    log4perl.appender.Log = Yandex::Appender::File
-    log4perl.appender.Log.filename = tfiles/unrotate.log
-    log4perl.appender.Log.layout = PatternLayout
-    log4perl.appender.Log.layout.ConversionPattern = %d: %p: %c: %m%n
-    log4perl.logger = INFO, Log
-}});
-
 package LogWriter;
 
+use t::Utils;
 use IO::Handle;
-use Yandex::X qw(xopen xclose xsystem xprint);
 
 sub new ($;$) {
     my ($class, $props) = @_;
@@ -67,7 +59,7 @@ sub rotate ($) {
     my ($self) = @_;
     my @logs = sort { $b <=> $a } map { /\.(\d+)$/ and $1 or 0 } glob("$self->{LogFile}*");
     for (@logs) {
-        xsystem("mv " . $self->logfile($_) . " " . $self->logfile($_ + 1)); 
+        xsystem("mv " . $self->logfile($_) . " " . $self->logfile($_ + 1));
     }
 }
 
@@ -75,7 +67,7 @@ sub remove ($;$) {
     my ($self, $n) = @_;
     my $log = $self->logfile($n);
     xsystem("rm -f $log");
-    
+
 }
 
 sub clear ($) {
@@ -90,7 +82,7 @@ sub DESTROY ($) {
 
 1;
 
-package Yandex::Unrotate::test;
+package Log::Unrotate::test;
 
 use strict;
 use warnings;
@@ -99,8 +91,7 @@ use lib qw(lib);
 use Test::More tests => 52;
 use Test::Exception;
 use IO::Handle;
-use Yandex::Logger;
-use Yandex::X qw(xsystem xqx);
+use t::Utils;
 
 xsystem('rm -rf tfiles && mkdir tfiles');
 
@@ -131,7 +122,7 @@ sub reader ($;$) {
 }
 
 # empty log (2)
-{ 
+{
     my $writer = new LogWriter;
     $writer->touch();
     my $reader = reader($writer);
@@ -285,7 +276,7 @@ sub reader ($;$) {
     $reader = reader($writer, {CheckInode => 1});
     my $line = $reader->readline();
     is($line, "test1\n", "CheckInode saves from LastLine collision");
-    
+
     $writer->clear();
     $writer->write("test1");
     $writer->write("test2");
@@ -376,7 +367,7 @@ sub reader ($;$) {
     $reader = reader($writer);
     $reader->readline();
     $reader->commit();
-    
+
     $writer->rotate();
     $writer->write("test1");
     $writer->rotate();
@@ -405,7 +396,7 @@ sub reader ($;$) {
     $reader = reader($writer);
     my $line = $reader->readline();
     is($line, "test3\n", "A rotated log may be updated till the new log is empty");
-    
+
     $reader->readline();
     $reader->commit();
     $writer->write("test4");

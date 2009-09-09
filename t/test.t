@@ -11,18 +11,11 @@ use Test::More tests => 57;
 use Test::Exception;
 use IO::Handle;
 
-use PPB::Shell qw(xsystem xqx);
-use PPB::Ssh;
-use Yandex::Logger;
-
-use t::Utils qw(devnull_stderr restore_stderr devnull_stdout restore_stdout);
+use t::Utils;
 
 BEGIN {
     use_ok('Log::Unrotate');
 }
-
-
-our $remote_mode = ($0 =~ /remote/);
 
 xsystem('rm -rf tfiles && mkdir tfiles');
 
@@ -32,19 +25,10 @@ my $line;
 
 sub params()
 {
-    my $params;
-    if ($remote_mode) {
-        $params = {
-            PosFile => 'tfiles/test.pos',
-            LogFile => 'tfiles/test.log',
-            Host => 'feeddev.yandex.ru',
-        };
-    } else {
-        $params = {
-            PosFile => 'tfiles/test.pos',
-            LogFile => 'tfiles/test.log',
-        };
-    }
+    my $params = {
+        PosFile => 'tfiles/test.pos',
+        LogFile => 'tfiles/test.log',
+    };
     return $params;
 }
 
@@ -54,48 +38,32 @@ sub print_log($;$$)
 {
     my ($line, $file, $nonewline) = @_;
     $file ||= 'test.log';
-	$nonewline ||= 0;
-    DEBUG "Print $line to log";
-    if ($remote_mode) {
-        PPB::Ssh::execute(
-            Command => "echo $line >>tfiles/$file",
-            Host => 'feeddev.yandex.ru',
-        );
-    } else {
-        open my $LOG, ">>tfiles/$file" or die; 
-        $LOG->autoflush(1);
-        print $LOG $line;
-		print $LOG "\n" unless $nonewline;
-    }
+    $nonewline ||= 0;
+    diag("Print $line to log") if $ENV{DEBUG};
+
+    open my $LOG, ">>tfiles/$file" or die;
+    $LOG->autoflush(1);
+    print $LOG $line;
+    print $LOG "\n" unless $nonewline;
 }
 
 sub execute($)
 {
     my $command = shift;
-    DEBUG "Execute $command";
+    diag("Execute $command") if $ENV{DEBUG};
 
-    if ($remote_mode) {
-        PPB::Ssh::execute(
-            Command => "cd tfiles; $command",
-            Host => 'feeddev.yandex.ru',
-        );
-    } else {
-        xsystem("cd tfiles; $command");
-    }
+    xsystem("cd tfiles; $command");
 }
 
 sub clear(;$)
 {
-	my $donotclear = shift || 0;
+    my $donotclear = shift || 0;
     execute('rm -f *') unless $donotclear;
-    if ($remote_mode) {
-        xsystem('rm -f tfiles/test.pos');
-    }
 }
 
 sub prepare_three_logs(;$)
 {
-	my $donotclear = shift || 0;
+    my $donotclear = shift || 0;
     clear($donotclear);
     print_log('first', 'test.log.2');
     print_log('second', 'test.log.2');
@@ -106,12 +74,6 @@ sub prepare_three_logs(;$)
 }
 
 xsystem('rm -rf tfiles && mkdir tfiles'); # both local and remote
-if ($remote_mode) {
-    PPB::Ssh::execute(
-        Command => 'rm -rf tfiles && mkdir tfiles',
-        Host => 'feeddev.yandex.ru',
-    );
-}
 
 # ============ tests ===========
 
@@ -377,7 +339,7 @@ devnull_stderr();
 devnull_stdout();
 execute('echo blah > test.pos');
 eval {
-	$reader = new Log::Unrotate($params);
+    $reader = new Log::Unrotate($params);
 };
 $exception = "$@";
 restore_stderr();
@@ -389,7 +351,7 @@ devnull_stderr();
 devnull_stdout();
 execute('echo "" > test.pos');
 eval {
-	$reader = new Log::Unrotate($params);
+    $reader = new Log::Unrotate($params);
 };
 $exception = "$@";
 restore_stderr();
@@ -456,11 +418,4 @@ $reader->commit();
 print_log("d");
 $reader = new Log::Unrotate($params);
 is($reader->readline(), "d\n");
-
-if ($remote_mode) {
-    PPB::Ssh::execute(
-        Command => 'rm -rf tfiles',
-        Host => 'feeddev.yandex.ru',
-    );
-}
 

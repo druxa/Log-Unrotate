@@ -7,7 +7,7 @@ use Test::More tests => 7;
 
 use lib 'lib';
 
-use Yandex::X qw(xopen xclose xsystem xqx);
+use t::Utils;
 
 xsystem("rm -rf tfiles");
 xsystem("mkdir tfiles");
@@ -43,7 +43,6 @@ xclose($log);
 
     $result = xqx("perl -Ilib bin/unrotate tfiles/file.pos tfiles/file.log");
     is($result, join('', map {"line $_\n"} (11..30)), "-n is infinite by default");
-            
 }
 
 # posfile stores logfile name (1)

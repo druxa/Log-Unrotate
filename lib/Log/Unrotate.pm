@@ -3,19 +3,27 @@ package Log::Unrotate;
 use strict;
 use warnings;
 
-our $VERSION = '1.00';
-
 =head1 NAME
 
 Log::Unrotate - Reader of rotated logs.
 
+=head1 VERSION
+
+Version 1.00
+
+=cut
+
+our $VERSION = '1.00';
+
 =head1 SYNOPSIS
 
   use Log::Unrotate;
+
   my $reader = Log::Unrotate->new({
       LogFile => 'xxx.log',
       PosFile => 'xxx.pos',
   });
+
   $reader->readline();
   $reader->readline();
   $reader->readline();
@@ -23,7 +31,7 @@ Log::Unrotate - Reader of rotated logs.
   my $position = $reader->position();
   $reader->readline();
   $reader->readline();
-  $reader->commit($position); #rollback the last 2 readline
+  $reader->commit($position); # rollback the last 2 readline
   my $lag = $reader->lag();
 
 =head1 DESCRIPTION
@@ -110,24 +118,15 @@ When B<EndPos> is C<future>, it allows reading the part of the log that was appe
 
 =item B<CheckInode>
 
-  This flag is set by default. It enables inode checks when detecting log rotations.
-  This option should be disabled when retrieving logs via rsync or some other way which modifies inodes.
+This flag is set by default. It enables inode checks when detecting log rotations. This option should be disabled when retrieving logs via rsync or some other way which modifies inodes.
 
-=item B<CheckChecksum>
+=item B<CheckLastLine>
 
-  This flag is deprecated, use CheckLastline insead.
-  It enables md5 checksum checks when detecting log rotations.
-
-=item B<CheckLastline>
-
-  This flag is set by default. It enables content checks when detecting log rotations.
-  There is actually no reason to disable this option.
+This flag is set by default. It enables content checks when detecting log rotations. There is actually no reason to disable this option.
 
 =item B<Filter>
 
-  You can specify subroutine ref here to filter each line.
-  If subroutine will throw exception, it will be passed through to readline() caller.
-  Subroutine can transform line to any scalar, including hashrefs or objects.
+You can specify subroutine ref here to filter each line. If subroutine will throw exception, it will be passed through to readline() caller. Subroutine can transform line to any scalar, including hashrefs or objects.
 
 =back
 

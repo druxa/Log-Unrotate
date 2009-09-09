@@ -1,9 +1,16 @@
-use 5.006;
+use strict;
+use warnings;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
     NAME              => 'Log::Unrotate',
-    PREREQ_PM         => {},
+    VERSION_FROM => 'lib/Log/Unrotate.pm',
+    ABSTRACT_FROM       => 'lib/Log/Unrotate.pm',
+    PREREQ_PM         => {
+        'Test::More' => 0,
+        'Test::Exception' => 0,
+    },
+    LICENSE => 'perl',
     AUTHOR         => 'Andrei Mishchenko <druxa@yandex-team.ru>',
     EXE_FILES      => ['bin/unrotate'],
     clean => { FILES => 'tfiles' },
