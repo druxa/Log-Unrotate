@@ -1,0 +1,9 @@
+bin/unrotate
+lib/Log/Unrotate.pm
+Makefile.PL
+t/bin.t
+t/new.t
+t/pod.t
+t/pod_coverage.t
+t/test.t
+t/Utils.pm

@@ -1,0 +1,5 @@
+liblog-unrotate-perl (1.0-1) unstable; urgency=low
+
+  * Yandex::Unrotate renamed to Log::Unrotate to be opensourced
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Wed, 09 Sep 2009 04:18:52 +0400

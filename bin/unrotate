@@ -1,0 +1,51 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Log::Unrotate;
+
+=head1 NAME
+
+unrotate - reads lines from log using Log::Unrotate and given pos file
+
+=head1 SYNOPSIS
+
+unrotate [-n 5] [-c] file.pos [file.log]
+
+=cut
+
+use Getopt::Long 2.33;
+use Pod::Usage;
+
+my $limit;
+my $commit;
+
+GetOptions(
+    'n=i'       => \$limit,
+    'c|commit'    => \$commit,
+) or pod2usage(2);
+pod2usage(2) if @ARGV == 0 or @ARGV > 2;
+
+my $pos = shift @ARGV;
+my $log = shift @ARGV; # may be undefined
+
+my $reader = Log::Unrotate->new({
+  LogFile => $log,
+  PosFile => $pos,
+});
+
+my $processed = 0;
+while (my $line = $reader->readline()) {
+    print $line;
+    $processed++;
+    last if $limit and $processed >= $limit;
+}
+
+$reader->commit() if $commit;
+
+=head1 AUTHOR
+
+Vyacheslav Matjukhin <mmcleric@yandex-team.ru>
+
+=cut
