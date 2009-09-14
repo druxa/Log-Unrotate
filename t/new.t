@@ -57,9 +57,10 @@ sub touch ($;$) {
 
 sub rotate ($) {
     my ($self) = @_;
-    my @logs = sort { $b <=> $a } map { /\.(\d+)$/ and $1 or 0 } glob("$self->{log}*");
-    for (@logs) {
-        xsystem("mv " . $self->logfile($_) . " " . $self->logfile($_ + 1));
+    for (reverse 0..10) {
+        if (-e $self->logfile($_)) {
+            xsystem("mv " . $self->logfile($_) . " " . $self->logfile($_ + 1));
+        }
     }
 }
 
@@ -88,7 +89,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 69;
+use Test::More tests => 71;
 use Test::Exception;
 use IO::Handle;
 use t::Utils;
@@ -256,6 +257,25 @@ sub reader ($;$) {
     $reader = reader($writer);
     my $line = $reader->read();
     is($line, "test2\n", "Empty files skipped");
+}
+
+# ignoring files with garbage after log number (1)
+{
+    my $writer = new LogWriter;
+    $writer->write("test1");
+    my $reader = reader($writer);
+    $reader->read();
+    $reader->commit();
+    $writer->rotate();
+    $writer->touch();
+    xsystem('echo abc >'.$writer->logfile(1).'.trash');
+    $writer->rotate();
+    $writer->touch();
+    $writer->rotate();
+    $writer->write("test2");
+    $reader = reader($writer);
+    my $line = $reader->read();
+    is($line, "test2\n", "Trash log skipped");
 }
 
 # position 0 issue (2)
@@ -448,7 +468,7 @@ sub reader ($;$) {
     is($line, "test3\n", "start => 'end' interpreted properly");
 }
 
-# lag (2)
+# lag (3)
 {
     my $writer = new LogWriter;
     $writer->write("test0");
@@ -468,6 +488,10 @@ sub reader ($;$) {
     $writer->write("test8");
     $reader = reader($writer);
     is($reader->lag(), 8*6, "lag() is correct on a multiple logs");
+
+    $writer->clear;
+    $reader = reader($writer);
+    throws_ok(sub { $reader->lag() }, qr/lag failed/, "can't get lag() when log is missing");
 }
 
 # exceptions (4)
@@ -568,7 +592,11 @@ sub reader ($;$) {
     my $writer = new LogWriter();
     my $reader = reader($writer, { lock => 'blocking' });
     lives_ok(sub { reader($writer) }, 'constructing second writer without locks lives');
-    lives_ok(sub { reader($writer, { lock => 'none' }) }, "constructing second writer without locks, explicitly specifying that we don't need lock");
+
+    SKIP: {
+        skip "solaris flock behavior is different from linux (TODO - it should be tested anyway)" => 1 if $^O =~ /solaris/i;
+        lives_ok(sub { reader($writer, { lock => 'none' }) }, "constructing second writer without locks, explicitly specifying that we don't need lock");
+    }
     dies_ok(sub { reader($writer, { lock => 'nonblocking' }) }, 'constructing second writer with lock dies');
 
     undef $reader;

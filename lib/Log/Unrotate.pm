@@ -9,11 +9,11 @@ Log::Unrotate - Reader of rotated logs.
 
 =head1 VERSION
 
-Version 1.00
+Version 1.01
 
 =cut
 
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
 =head1 SYNOPSIS
 
@@ -385,7 +385,7 @@ sub read($)
         return;
     }
 
-    $self->{LastLine} = $line if defined $line;
+    $self->{LastLine} = $line;
     $line = $self->{filter}->($line) if $self->{filter};
     return $line;
 }

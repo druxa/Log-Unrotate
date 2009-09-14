@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# vim: syn=perl
+# vim: ft=perl
 
 package Log::Unrotate::test;
 
@@ -358,11 +358,14 @@ restore_stderr();
 restore_stdout();
 like ($exception, qr/missing/, 'Die when empty posfile');
 
-my $abc = xqx(q#echo abc | perl -Ilib -e '
-    use Log::Unrotate;
-    $u = new Log::Unrotate({pos => "-", log => "/dev/stdin", end => "future"});
-    print $u->read()'#);
-is ($abc, "abc\n", 'log => "/dev/stdin"');
+SKIP: {
+    skip '/dev/stdin not found' => 1 unless -e '/dev/stdin';
+    my $abc = xqx(q#echo abc | perl -Ilib -e '
+        use Log::Unrotate;
+        $u = new Log::Unrotate({pos => "-", log => "/dev/stdin", end => "future"});
+        print $u->read()'#);
+    is ($abc, "abc\n", 'log => "/dev/stdin"');
+}
 
 clear();
 execute('echo ' . ('abc'x100) . ' >test.log');

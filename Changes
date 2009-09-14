@@ -1,5 +1,9 @@
 Revision history for Log-Unrotate
 
+1.01    Mon Sep 14, 2009
+        * Fixing (skipping, mostly) tests on solaris and windows
+        * Testing coverage increased to 93.6 percents
+
 1.00    Wed Sep 9, 2009
         First opensource release.
 
