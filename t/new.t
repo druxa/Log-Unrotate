@@ -542,7 +542,7 @@ sub reader ($;$) {
 
 # log => "-" (1)
 {
-    my $test1 = xqx(q#echo test1 | perl -Ilib -e '
+    my $test1 = xqx(q#echo test1 | #.$^X.q# -Ilib -e '
     use Log::Unrotate;
     $reader = new Log::Unrotate({pos => "-", log => "-", end => "future"});
     print $reader->read()'#);
@@ -591,13 +591,14 @@ sub reader ($;$) {
 {
     my $writer = new LogWriter();
     my $reader = reader($writer, { lock => 'blocking' });
+
     lives_ok(sub { reader($writer) }, 'constructing second writer without locks lives');
+    lives_ok(sub { reader($writer, { lock => 'none' }) }, "constructing second writer without locks, explicitly specifying that we don't need lock");
 
     SKIP: {
         skip "solaris flock behavior is different from linux (TODO - it should be tested anyway)" => 1 if $^O =~ /solaris/i;
-        lives_ok(sub { reader($writer, { lock => 'none' }) }, "constructing second writer without locks, explicitly specifying that we don't need lock");
+        dies_ok(sub { reader($writer, { lock => 'nonblocking' }) }, 'constructing second writer with lock dies');
     }
-    dies_ok(sub { reader($writer, { lock => 'nonblocking' }) }, 'constructing second writer with lock dies');
 
     undef $reader;
     lives_ok(sub { reader($writer, { lock => 'nonblocking' }) }, 'destructor releases lock');
