@@ -18,10 +18,22 @@ our @EXPORT = qw(
     xprint
     xopen
     xclose
+    xecho
 );
 
 my $stderr_backup;
 my $stdout_backup;
+
+BEGIN {
+    # recreating tfiles
+    use File::Path;
+    rmtree('tfiles');
+    if (-d 'tfiles') {
+        die "Failed to delete tfiles";
+    }
+    mkdir 'tfiles' or die "Can't create tfiles: $!";
+
+}
 
 sub devnull_stderr()
 {
@@ -82,6 +94,14 @@ sub xqx (@) {
     my $res = qx{@_};
     croak "xqx '@_' failed: $?" if $? != 0;
     return $res;
+}
+
+sub xecho($$) {
+    # fill file with given content
+    my ($content, $file) = @_;
+    my $fh = xopen('>', $file);
+    print {$fh} "$content\n";
+    xclose($fh);
 }
 
 1;

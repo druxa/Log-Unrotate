@@ -59,7 +59,7 @@ sub rotate ($) {
     my ($self) = @_;
     for (reverse 0..10) {
         if (-e $self->logfile($_)) {
-            xsystem("mv " . $self->logfile($_) . " " . $self->logfile($_ + 1));
+            rename $self->logfile($_), $self->logfile($_ + 1) or die "rename failed: $!";
         }
     }
 }
@@ -67,13 +67,18 @@ sub rotate ($) {
 sub remove ($;$) {
     my ($self, $n) = @_;
     my $log = $self->logfile($n);
-    xsystem("rm -f $log");
-
+    if (-e $log) {
+        unlink $log or die "Can't unlink $log: $!";
+    }
 }
 
 sub clear ($) {
     my ($self) = @_;
-    xsystem("rm -f $self->{log}* $self->{pos}");
+    for my $file ($self->{pos}, glob("$self->{log}*")) {
+        if (-e $file) {
+            unlink $file or die "Can't unlink $file: $!";
+        }
+    }
 }
 
 sub DESTROY ($) {
@@ -91,10 +96,9 @@ use lib qw(lib);
 
 use Test::More tests => 71;
 use Test::Exception;
+use File::Copy qw();
 use IO::Handle;
 use t::Utils;
-
-xsystem('rm -rf tfiles && mkdir tfiles');
 
 BEGIN {
     use_ok('Log::Unrotate');
@@ -268,7 +272,11 @@ sub reader ($;$) {
     $reader->commit();
     $writer->rotate();
     $writer->touch();
-    xsystem('echo abc >'.$writer->logfile(1).'.trash');
+    { # fill non-log file
+        my $fh = xopen('>', $writer->logfile(1).'.trash');
+        print {$fh} "abc\n";
+        xclose($fh);
+    }
     $writer->rotate();
     $writer->touch();
     $writer->rotate();
@@ -321,7 +329,11 @@ sub reader ($;$) {
     $reader->read();
     $reader->commit();
     my $log = $writer->logfile();
-    xsystem("cp $log $log.1 && mv $log.1 $log"); # change inode
+
+    # change inode
+    File::Copy::copy($log, "$log.1") or die "Copy failed: $!";
+    rename("$log.1", $log) or die "Rename failed: $!";
+
     $reader = reader($writer, {check_inode => 0});
     $line = $reader->read();
     is($line, "test2\n", "Skip inode check when check_inode is off");
@@ -505,14 +517,14 @@ sub reader ($;$) {
     $reader->read();
     $reader->commit();
     my $logfile = $writer->logfile();
-    xsystem("echo test4 >$logfile");
+    xecho("test4", $logfile);
     throws_ok(sub {$reader = reader($writer, {check_inode => 1, check_lastline => 0})}, qr/unable to find/, "Check for too big Position");
     my $posfile = $writer->posfile();
-    xsystem("echo 'LastLine: test1' >$posfile");
+    xecho('LastLine: test1', $posfile);
     throws_ok(sub {$reader = reader($writer)}, qr/missing/, "Check .pos file mandatory fields");
-    xsystem("echo blah >$posfile");
+    xecho("blah", $posfile);
     throws_ok(sub {$reader = reader($writer)}, qr/missing/, "Check .pos file syntax");
-    xsystem("echo >$posfile");
+    xecho("", $posfile);
     throws_ok(sub {$reader = reader($writer)}, qr/missing/, "Check .pos file is not empty");
 }
 
@@ -596,7 +608,8 @@ sub reader ($;$) {
     lives_ok(sub { reader($writer, { lock => 'none' }) }, "constructing second writer without locks, explicitly specifying that we don't need lock");
 
     SKIP: {
-        skip "solaris flock behavior is different from linux (TODO - it should be tested anyway)" => 1 if $^O =~ /solaris/i;
+        skip "solaris flock behavior is different from linux (FIXME - it should be tested anyway)" => 1 if $^O =~ /solaris/i;
+        skip "irix flock behavior is different from linux (FIXME - it should be tested anyway)" => 1 if $^O =~ /irix/i;
         dies_ok(sub { reader($writer, { lock => 'nonblocking' }) }, 'constructing second writer with lock dies');
     }
 
@@ -613,13 +626,23 @@ sub reader ($;$) {
     $writer->write('abc');
     my $reader = reader($writer);
     $reader->commit;
-    xsystem('cp', $writer->logfile, "tfiles/another.log");
+    File::Copy::copy($writer->logfile, "tfiles/another.log") or die "copy failed: $!";
     lives_ok(sub { reader($writer, { log => 'tfiles/another.log' }) }, "without check_log, it's ok to change log file");
     throws_ok(sub { reader($writer, { log => 'tfiles/another.log', check_log => 1 }) }, qr/logfile mismatch/, "with check_log, it's not ok");
 
     lives_ok(sub { Log::Unrotate->new({ pos => $writer->posfile }) }, 'loading logfile from posfile if log not specified');
-    xsystem("grep -v 'logfile:' ".$writer->posfile." >tfiles/new.pos");
+
+    # remove logfile line from posfile
+    my $pos_fh = xopen('<', $writer->posfile);
+    my $new_pos_fh = xopen('>', 'tfiles/new.pos');
+    while (<$pos_fh>) {
+        next if /^logfile:/;
+        print {$new_pos_fh} $_;
+    }
+    xclose($pos_fh);
+    xclose($new_pos_fh);
     rename('tfiles/new.pos', $writer->posfile);
+
     throws_ok(sub { Log::Unrotate->new({ pos => $writer->posfile }) }, qr/log not specified/, "constructor dies if no log specified and pos file doesn't contain log name");
 }
 

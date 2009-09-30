@@ -9,9 +9,6 @@ use lib 'lib';
 
 use t::Utils;
 
-xsystem("rm -rf tfiles");
-xsystem("mkdir tfiles");
-
 my $log = xopen(">tfiles/file.log");
 for my $i (1 .. 30) {
     print {$log} "line $i\n";

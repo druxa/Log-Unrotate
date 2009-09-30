@@ -1,5 +1,8 @@
 Revision history for Log-Unrotate
 
+1.03    Thu Oct 1, 2009
+        Old tests removed, new tests fixed
+
 1.02    Tue Sep 15, 2009
         * Skipping correct test on Solaris
         * Require at least 5.8 perl to run

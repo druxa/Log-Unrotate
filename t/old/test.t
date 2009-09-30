@@ -3,6 +3,9 @@
 
 package Log::Unrotate::test;
 
+# old tests, almost all of them are covered by t/new.t
+# will be removed soon
+
 use strict;
 use warnings;
 use lib qw(lib);
@@ -16,8 +19,6 @@ use t::Utils;
 BEGIN {
     use_ok('Log::Unrotate');
 }
-
-xsystem('rm -rf tfiles && mkdir tfiles');
 
 my $reader;
 my $params;
@@ -72,8 +73,6 @@ sub prepare_three_logs(;$)
     print_log('fifth', 'test.log');
     print_log('sixth', 'test.log');
 }
-
-xsystem('rm -rf tfiles && mkdir tfiles'); # both local and remote
 
 # ============ tests ===========
 
@@ -360,7 +359,7 @@ like ($exception, qr/missing/, 'Die when empty posfile');
 
 SKIP: {
     skip '/dev/stdin not found' => 1 unless -e '/dev/stdin';
-    my $abc = xqx(q#echo abc | perl -Ilib -e '
+    my $abc = xqx(q#echo abc | #.$^X.q# -Ilib -e '
         use Log::Unrotate;
         $u = new Log::Unrotate({pos => "-", log => "/dev/stdin", end => "future"});
         print $u->read()'#);

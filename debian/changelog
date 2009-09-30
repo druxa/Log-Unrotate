@@ -1,3 +1,9 @@
+liblog-unrotate-perl (1.02-2) unstable; urgency=low
+
+  * Old tests removed, new tests fixed
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Thu, 01 Oct 2009 02:53:13 +0400
+
 liblog-unrotate-perl (1.02-1) unstable; urgency=low
 
   * Skipping correct test on Solaris
