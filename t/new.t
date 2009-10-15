@@ -142,6 +142,7 @@ sub reader ($;$) {
     $writer->write('test1');
     chmod 0000, $writer->logfile or die "chmod failed: $!";
     throws_ok(sub { reader($writer) }, qr/exists but is unreadable/, 'constructor fails when log is unreadable');
+    chmod 0644, $writer->logfile or die "chmod failed: $!";
     undef $writer;
 
     $writer = new LogWriter;
@@ -151,6 +152,7 @@ sub reader ($;$) {
 
     chmod 0000, $writer->posfile or die "chmod failed: $!";
     throws_ok(sub { reader($writer) }, qr/Can't open '.*.pos'/, 'constructor fails when pos is unreadable');
+    chmod 0644, $writer->posfile or die "chmod failed: $!";
 }
 
 # simple read (2)
@@ -618,6 +620,7 @@ sub reader ($;$) {
 
     chmod 0000, 'tfiles/test.pos.lock' or die "can't chmod lock file: $!";
     throws_ok(sub { reader($writer, { lock => 'nonblocking' }) }, qr/Can't open /, "constructor fails when lock can't be written");
+    chmod 0644, 'tfiles/test.pos.lock' or die "chmod failed: $!";
 }
 
 # caching log in pos (4)

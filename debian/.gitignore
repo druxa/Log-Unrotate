@@ -10,3 +10,5 @@
 /liblog-unrotate-perl.prerm.debhelper
 /liblog-unrotate-perl.postrm.debhelper
 /liblog-unrotate-perl.substvars
+/stamp-makefile-build
+/stamp-makefile-check

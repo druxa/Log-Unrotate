@@ -1,3 +1,22 @@
+liblog-unrotate-perl (1.03-3) unstable; urgency=low
+
+  * this package replaces /usr/bin/unrotate from libyandex-unrotate-perl
+    without conflicts (still trying to find smooth way to upgrade)
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Thu, 15 Oct 2009 17:11:13 +0400
+
+liblog-unrotate-perl (1.03-2) unstable; urgency=low
+
+  * explicit conflict with Yandex::Unrotate
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Fri, 09 Oct 2009 21:41:13 +0400
+
+liblog-unrotate-perl (1.03-1) unstable; urgency=low
+
+  * 1.03 version
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Fri, 09 Oct 2009 21:04:44 +0400
+
 liblog-unrotate-perl (1.02-2) unstable; urgency=low
 
   * Old tests removed, new tests fixed
