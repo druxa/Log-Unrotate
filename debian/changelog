@@ -1,3 +1,10 @@
+liblog-unrotate-perl (1.04) unstable; urgency=low
+
+  * set 644 permissions on pos file
+  * don't depend on ppb.mk, so deb-package is buildable from opensourced code
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Tue, 03 Nov 2009 18:49:31 +0300
+
 liblog-unrotate-perl (1.03-3) unstable; urgency=low
 
   * this package replaces /usr/bin/unrotate from libyandex-unrotate-perl

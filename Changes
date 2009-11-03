@@ -1,5 +1,8 @@
 Revision history for Log-Unrotate
 
+1.04    Tue Nov 3, 2009
+        Set 644 permissions on pos file.
+
 1.03    Thu Oct 1, 2009
         Old tests removed, new tests fixed
 

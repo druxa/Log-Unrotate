@@ -9,11 +9,11 @@ Log::Unrotate - Reader of rotated logs.
 
 =head1 VERSION
 
-Version 1.03
+Version 1.04
 
 =cut
 
-our $VERSION = '1.03';
+our $VERSION = '1.04';
 
 =head1 SYNOPSIS
 
@@ -438,6 +438,7 @@ sub commit($;$)
         die 'print into '.$fh->filename.' failed';
     }
 
+    chmod(0644, $fh->filename) or die "Failed to chmod ".$fh->filename.": $!";
     rename($fh->filename, $self->{pos}) or die "Failed to commit pos $self->{pos}: $!";
     $fh->unlink_on_destroy(0);
 }
