@@ -1,3 +1,10 @@
+liblog-unrotate-perl (1.05) unstable; urgency=low
+
+  * Throw exception and don't break pos file when trying to commit with
+    full disk.
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Mon, 23 Nov 2009 16:48:31 +0300
+
 liblog-unrotate-perl (1.04) unstable; urgency=low
 
   * set 644 permissions on pos file

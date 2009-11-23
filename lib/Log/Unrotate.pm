@@ -9,11 +9,11 @@ Log::Unrotate - Reader of rotated logs.
 
 =head1 VERSION
 
-Version 1.04
+Version 1.05
 
 =cut
 
-our $VERSION = '1.04';
+our $VERSION = '1.05';
 
 =head1 SYNOPSIS
 
@@ -434,6 +434,7 @@ sub commit($;$)
     if ($pos->{LastLine}) {
         $fh->print("lastline: $pos->{LastLine}\n");
     }
+    $fh->flush;
     if ($fh->error) {
         die 'print into '.$fh->filename.' failed';
     }
