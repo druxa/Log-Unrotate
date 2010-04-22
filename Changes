@@ -1,5 +1,8 @@
 Revision history for Log-Unrotate
 
+1.06    Thu Apr 22, 2010
+        Build using Module::Build
+
 1.05    Tue Nov 3, 2009
         Throw exception and don't break pos file when trying to commit with
         full disk.

@@ -1,3 +1,10 @@
+liblog-unrotate-perl (1.06) unstable; urgency=low
+
+  * build using Module::Build
+  * debian build don't use cdbs anymore
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Thu, 22 Apr 2010 23:11:22 +0400
+
 liblog-unrotate-perl (1.05) unstable; urgency=low
 
   * Throw exception and don't break pos file when trying to commit with
