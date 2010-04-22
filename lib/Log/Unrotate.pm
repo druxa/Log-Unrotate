@@ -142,7 +142,9 @@ When I<lock> is C<nonblocking>, lock named I<pos>.lock will be acquired in nonbl
 
 =item I<check_inode>
 
-This flag is set by default. It enables inode checks when detecting log rotations. This option should be disabled when retrieving logs via rsync or some other way which modifies inodes.
+This flag is disabled by default.
+
+It enables inode checks when detecting log rotations. This option should not be enabled when retrieving logs via rsync or some other way which modifies inodes.
 
 =item I<check_lastline>
 
