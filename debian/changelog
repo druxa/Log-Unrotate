@@ -1,3 +1,11 @@
+liblog-unrotate-perl (1.10) unstable; urgency=low
+
+  * end => 'future' moves to subsequent logs.
+  * In some cases, reading old logs when logrotate happened, could
+    result in skipping logfile
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Fri, 23 Apr 2010 20:45:48 +0400
+
 liblog-unrotate-perl (1.06) unstable; urgency=low
 
   * build using Module::Build
