@@ -337,12 +337,21 @@ sub _find_log ($$)
 {
     my ($self, $pos) = @_;
 
+    undef $self->{LastLine};
+    $self->_set_last_log_number();
+
     for ($self->{LogNumber} = 0; $self->{LogNumber} <= $self->{LastLogNumber}; $self->{LogNumber}++) {
 
         next unless $self->_reopen($pos->{Position});
         next if ($self->{check_inode} and $pos->{Inode} and $self->{Inode} and $pos->{Inode} ne $self->{Inode});
         next if ($self->{check_lastline} and $pos->{LastLine} and $pos->{LastLine} ne $self->_last_line());
-        return;
+
+        while () {
+            my @stat = stat $self->{Handle};
+            return 1 if $stat[7] > tell $self->{Handle};
+            $self->{LogNumber}--;
+            return 0 unless $self->_reopen(0);
+        }
     }
 
     die "unable to find the log: ", $self->_print_position($pos);
@@ -351,10 +360,10 @@ sub _find_log ($$)
 sub _next ($)
 {
     my ($self) = @_;
-    return 0 unless $self->{LogNumber};
-    # $self->_find_log($self->position());
-    $self->{LogNumber}--; #FIXME: logrotate could invoke between _next calls! #TODO: call _find_log!
-    return $self->_reopen(0);
+    #return 0 unless $self->{LogNumber};
+    return $self->_find_log($self->position());
+    #$self->{LogNumber}--; 
+    #return $self->_reopen(0);
 }
 
 ################################################# Public methods ######################################################

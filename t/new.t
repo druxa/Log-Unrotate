@@ -94,7 +94,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 72;
+use Test::More tests => 75;
 use Test::Exception;
 use File::Copy qw();
 use IO::Handle;
@@ -276,6 +276,26 @@ sub reader ($;$) {
     is($line, "test2\n", "Empty files skipped");
 }
 
+# reading .log.1 when log is rotated (2)
+{
+    my $writer = new LogWriter;
+    $writer->write("test1");
+    my $reader = reader($writer);
+    $reader->read();
+    $reader->commit();
+    $writer->write("test2");
+    $writer->write("test3");
+    $writer->rotate();
+    $writer->write("test4");
+    $reader = reader($writer);
+    $reader->read(); # test2
+    $reader->read(); # test3
+    $writer->rotate();
+    $writer->write("test5");
+    is($reader->read(), "test4\n", 'line in intermediate log is read');
+    is($reader->read(), "test5\n", 'last line');
+}
+
 # ignoring files with garbage after log number (1)
 {
     my $writer = new LogWriter;
@@ -364,15 +384,19 @@ sub reader ($;$) {
     is($line, undef, "Ignore what was written to the log after it was opened");
 }
 
-# end => "future" (1)
+# end => "future" (2)
 {
     my $writer = new LogWriter;
     $writer->write("test1");
     my $reader = reader($writer, {end => "future"});
     $reader->read();
     $writer->write("test2");
+    $writer->rotate();
+    $writer->write("test3");
     my $line = $reader->read();
     is($line, "test2\n", "Read what was written to the log after it was opened");
+    $line = $reader->read();
+    is($line, "test3\n", "end=future moves to subsequent logs too");
 }
 
 # incomplete lines (5)
