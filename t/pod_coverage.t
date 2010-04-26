@@ -10,10 +10,12 @@ use lib 'lib';
 eval "use Test::Pod::Coverage";
 plan skip_all => "Test::Pod::Coverage required for testing POD coverage" if $@;
 
+my $trustparents = { coverage_class => 'Pod::Coverage::CountParents' };
+
 my @modules = all_modules();
 plan tests => scalar @modules;
 
 for (@modules) {
-    pod_coverage_ok($_);
+    pod_coverage_ok($_, $trustparents);
 }
 

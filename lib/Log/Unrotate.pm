@@ -9,11 +9,11 @@ Log::Unrotate - Reader of rotated logs.
 
 =head1 VERSION
 
-Version 1.10
+Version 1.20
 
 =cut
 
-our $VERSION = '1.10';
+our $VERSION = '1.20';
 
 =head1 SYNOPSIS
 
@@ -45,10 +45,10 @@ It tries really hard to never skip any data from logs. If it's not sure about wh
 use Carp;
 
 use IO::Handle;
-use File::Basename;
-use File::Temp;
 use Digest::MD5 qw(md5_hex);
-use Fcntl qw(:flock);
+
+use Log::Unrotate::Cursor::File;
+use Log::Unrotate::Cursor::Null;
 
 sub _defaults ($) {
     my ($class) = @_;
@@ -59,11 +59,11 @@ sub _defaults ($) {
         check_inode => 0,
         check_lastline => 1,
         check_log => 0,
+        autofix_cursor => 0,
     };
 }
 
 our %_start_values = map { $_ => 1 } qw(begin end first);
-our %_lock_values = map { $_ => 1 } qw(none blocking nonblocking);
 our %_end_values = map { $_ => 1 } qw(fixed future);
 
 =head1 METHODS
@@ -83,6 +83,16 @@ Creates new unrotate object.
 Name of file to store log reading position. Will be created automatically if missing.
 
 Value '-' means not use position file. I.e., pretend it doesn't exist at start and ignore commit calls.
+
+=item I<cursor>
+
+Instead of C<pos> file, you can specify any custom cursor. See C<Log::Unrotate::Cursor> for cursor API details.
+
+=item I<autofix_cursor>
+
+Recreate cursor if it's broken.
+
+Warning will be printed. This option is dangerous and shouldn't be enabled light-heartedly.
 
 =item I<log>
 
@@ -150,10 +160,6 @@ It enables inode checks when detecting log rotations. This option should not be 
 
 This flag is set by default. It enables content checks when detecting log rotations. There is actually no reason to disable this option.
 
-=item I<filter>
-
-You can specify subroutine ref here to filter each line. If subroutine will throw exception, it will be passed through to B<read()> caller. Subroutine can transform line to any scalar, including hashrefs or objects.
-
 =back
 
 =cut
@@ -167,57 +173,58 @@ sub new ($$)
 
     croak "unknown start value: '$self->{start}'" unless $_start_values{$self->{start}};
     croak "unknown end value: '$self->{end}'" unless $_end_values{$self->{end}};
-    croak "unknown lock value: '$self->{lock}'" unless $_lock_values{$self->{lock}};
-    croak "filter should be subroutine ref" if $self->{filter} and ref($self->{filter}) ne 'CODE';
     croak "either check_inode or check_lastline should be on" unless $self->{check_inode} or $self->{check_lastline};
 
     bless $self => $class;
 
-    $self->{LogNumber} = 0;
-    my $pos;
+    if ($self->{pos} and $self->{cursor}) {
+        croak "only one of 'pos' and 'cursor' should be specified";
+    }
+    unless ($self->{pos} or $self->{cursor}) {
+        croak "one of 'pos' and 'cursor' should be specified";
+    }
 
-    if ($self->{pos} eq '-' or not -e $self->{pos}) {
-        if (not defined $self->{log}) {
-            croak "Position file $self->{pos} not found and log not specified";
+    my $posfile = delete $self->{pos};
+    if ($posfile) {
+        if ($posfile eq '-') {
+            croak "Log not specified and posfile is '-'" if not defined $self->{log};
+            $self->{cursor} = Log::Unrotate::Cursor::Null->new();
+        }
+        else {
+            croak "Log not specified and posfile is not found" if not defined $self->{log} and not -e $posfile;
+            $self->{cursor} = Log::Unrotate::Cursor::File->new($posfile, { lock => $self->{lock} });
         }
     }
 
-    if ($self->{pos} ne '-' and $self->{lock} ne 'none') {
-        # locks
-        unless (open $self->{lock_fh}, '>>', "$self->{pos}.lock") {
-            delete $self->{lock_fh};
-            croak "Can't open $self->{pos}.lock: $!";
-        }
-        if ($self->{lock} eq 'blocking') {
-            flock $self->{lock_fh}, LOCK_EX or croak "Failed to obtain lock: $!";
-        }
-        elsif ($self->{lock} eq 'nonblocking') {
-            flock $self->{lock_fh}, LOCK_EX | LOCK_NB or croak "Failed to obtain lock: $!";
-        }
-    }
-
-    if ($self->{pos} ne '-' and -e $self->{pos}) {
-        open my $fh, '<', $self->{pos} or die "Can't open '$self->{pos}': $!";
-        my $posfile = do {local $/; <$fh>};
-        $posfile =~ /position:\s*(\d+)/ and $pos->{Position} = $1;
-        die "missing 'position:' in $self->{pos}" unless defined $pos->{Position};
-        $posfile =~ /inode:\s*(\d+)/ and $pos->{Inode} = $1;
-        $posfile =~ /lastline:\s(.*)/ and $pos->{LastLine} = $1;
-        $posfile =~ /logfile:\s(.*)/ and my $logfile = $1;
+    my $pos = $self->{cursor}->read();
+    if ($pos) {
+        my $logfile = delete $pos->{LogFile};
         if ($self->{log}) {
             die "logfile mismatch: $logfile ne $self->{log}" if $self->{check_log} and $logfile and $self->{log} ne $logfile;
         } else {
-            $self->{log} = $logfile or die "'logfile:' not found in position file $self->{pos} and log not specified";
+            $self->{log} = $logfile or die "'logfile:' not found in cursor $self->{cursor} and log not specified";
         }
     }
 
-
-    $self->{LogNumber} = 0;
     $self->_set_last_log_number();
     $self->_set_eof();
 
     if ($pos) {
-        $self->_find_log($pos);
+        my $found = eval {
+            $self->_find_log($pos);
+            1;
+        };
+        unless ($found) {
+            if ($self->{autofix_cursor}) {
+                warn $@;
+                warn "autofix_cursor is enabled, cleaning $self->{cursor}";
+                $self->{cursor}->clean();
+                $self->_start();
+            }
+            else {
+                die $@;
+            }
+        }
     } else {
         $self->_start();
     }
@@ -259,6 +266,7 @@ sub _last_line ($) {
 sub _start($)
 {
     my $self = shift;
+    $self->{LogNumber} = 0;
     if ($self->{start} eq 'end') { # move to the end of file
         $self->_reopen(0, 2);
     } elsif ($self->{start} eq 'begin') { # move to the beginning of last file
@@ -328,8 +336,8 @@ sub _print_position ($$)
     my $inode = defined $pos->{Inode} ? $pos->{Inode} : "[unknown]";
     my $position = defined $pos->{Position} ? $pos->{Position} : "[unknown]";
     my $logfile = $self->{log};
-    my $posfile = $self->{pos};
-    return "PosFile: $posfile, LogFile: $logfile, Inode: $inode, Position: $position, LastLine: $lastline";
+    my $cursor = $self->{cursor};
+    return "Cursor: $cursor, LogFile: $logfile, Inode: $inode, Position: $position, LastLine: $lastline";
 }
 
 # look through .log .log.1 .log.2, etc., until we'll find log with correct inode and/or checksum.
@@ -341,11 +349,9 @@ sub _find_log ($$)
     $self->_set_last_log_number();
 
     for ($self->{LogNumber} = 0; $self->{LogNumber} <= $self->{LastLogNumber}; $self->{LogNumber}++) {
-
         next unless $self->_reopen($pos->{Position});
         next if ($self->{check_inode} and $pos->{Inode} and $self->{Inode} and $pos->{Inode} ne $self->{Inode});
         next if ($self->{check_lastline} and $pos->{LastLine} and $pos->{LastLine} ne $self->_last_line());
-
         while () {
             my @stat = stat $self->{Handle};
             return 1 if $stat[7] > tell $self->{Handle};
@@ -355,15 +361,6 @@ sub _find_log ($$)
     }
 
     die "unable to find the log: ", $self->_print_position($pos);
-}
-
-sub _next ($)
-{
-    my ($self) = @_;
-    #return 0 unless $self->{LogNumber};
-    return $self->_find_log($self->position());
-    #$self->{LogNumber}--; 
-    #return $self->_reopen(0);
 }
 
 ################################################# Public methods ######################################################
@@ -387,7 +384,7 @@ sub read($)
         }
         $line = <$FILE>;
         last if defined $line;
-        return unless $self->_next();
+        return unless $self->_find_log($self->position());
     }
 
     if ($line !~ /\n$/ and $self->lag() == 0) {
@@ -397,7 +394,6 @@ sub read($)
     }
 
     $self->{LastLine} = $line;
-    $line = $self->{filter}->($line) if $self->{filter};
     return $line;
 }
 
@@ -415,6 +411,7 @@ sub position($)
         $pos->{Position} = tell $self->{Handle};
         $pos->{Inode} = $self->{Inode};
         $pos->{LastLine} = $self->_last_line();  # undefined LastLine forces _last_line to backstep
+        $pos->{LogFile} = $self->{log}; # always .log, not .log.N
     }
 
     return $pos;
@@ -430,29 +427,10 @@ Position file gets commited using temporary file, so it'll not be lost if disk s
 sub commit($;$)
 {
     my ($self, $pos) = @_;
-    return if $self->{pos} eq '-';
-    $pos = $self->position() unless $pos;
-
+    $pos ||= $self->position();
     return unless defined $pos->{Position}; # pos is missing and log either => do nothing
 
-    my $fh = File::Temp->new(DIR => dirname($self->{pos}));
-
-    $fh->print("logfile: $self->{log}\n");
-    $fh->print("position: $pos->{Position}\n");
-    if ($pos->{Inode}) {
-        $fh->print("inode: $pos->{Inode}\n");
-    }
-    if ($pos->{LastLine}) {
-        $fh->print("lastline: $pos->{LastLine}\n");
-    }
-    $fh->flush;
-    if ($fh->error) {
-        die 'print into '.$fh->filename.' failed';
-    }
-
-    chmod(0644, $fh->filename) or die "Failed to chmod ".$fh->filename.": $!";
-    rename($fh->filename, $self->{pos}) or die "Failed to commit pos $self->{pos}: $!";
-    $fh->unlink_on_destroy(0);
+    $self->{cursor}->commit($pos);
 }
 
 =item B<< lag() >>
@@ -477,13 +455,6 @@ sub lag ($)
 
     $lag -= tell $self->{Handle};
     return $lag;
-}
-
-sub DESTROY {
-    my ($self) = @_;
-    if ($self->{lock_fh}) {
-        flock $self->{lock_fh}, LOCK_UN;
-    }
 }
 
 =back

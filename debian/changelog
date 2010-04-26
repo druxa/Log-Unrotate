@@ -1,3 +1,11 @@
+liblog-unrotate-perl (1.20) unstable; urgency=low
+
+  * position persistence logic moved to separate Cursor::* classes
+  * 'autofix_cursor' option implemented
+  * support for 'filter' option removed
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Mon, 26 Apr 2010 17:45:45 +0400
+
 liblog-unrotate-perl (1.10) unstable; urgency=low
 
   * end => 'future' moves to subsequent logs.

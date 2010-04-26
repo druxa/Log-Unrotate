@@ -94,8 +94,9 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 75;
+use Test::More tests => 74;
 use Test::Exception;
+use Test::NoWarnings;
 use File::Copy qw();
 use IO::Handle;
 use t::Utils;
@@ -571,10 +572,9 @@ sub reader ($;$) {
     throws_ok(sub { reader($writer, { start => 'blah' }) }, qr/unknown start value/, 'constructor checks start value');
     throws_ok(sub { reader($writer, { end => 'blah' }) }, qr/unknown end value/, 'constructor checks end value');
     throws_ok(sub { reader($writer, { lock => 'blah' }) }, qr/unknown lock value/, 'constructor checks lock value');
-    throws_ok(sub { reader($writer, { filter => 'blah' }) }, qr/filter should be subroutine ref/, 'constructor checks filter value');
     throws_ok(sub { reader($writer, { check_inode => 0, check_lastline => 0 }) }, qr/either check_inode or check_lastline/, 'constructor checks that one of check flags is on');
 
-    throws_ok(sub { Log::Unrotate->new({ pos => '-' }) }, qr/Position file .* not found and log not specified/, 'constructor croaks if not enough parameters specified');
+    throws_ok(sub { Log::Unrotate->new({ pos => '-' }) }, qr/Log not specified and posfile is '-'/, 'constructor croaks if not enough parameters specified');
 }
 
 # pos => "-" (1)
@@ -612,28 +612,6 @@ sub reader ($;$) {
     $reader = reader($writer);
     my $line = $reader->read();
     is($line =~ s/test2//g, 10000, "Long lines are read correctly");
-}
-
-# filtering (4)
-{
-    my $writer = new LogWriter;
-    $writer->write(123);
-    $writer->write(111);
-    $writer->write(5);
-    $writer->write("special");
-    my $filter = sub {
-        my $line = shift;
-        chomp $line;
-        die "!!!111" if $line eq '111';
-        return {something => 'special'} if $line eq 'special';
-        return $line * 2;
-    };
-    my $reader = reader($writer, {filter => $filter});
-    my $line = $reader->read();
-    is($line, "246", 'filter works');
-    throws_ok(sub {$reader->read()}, qr/^!!!111/, 'filter exceptions are passed through');
-    is($reader->read(), "10", "filter exceptions do not break reading if catched");
-    is($reader->read()->{something}, "special", "filter can return hashref");
 }
 
 # locks (5)
@@ -682,5 +660,31 @@ sub reader ($;$) {
     rename('tfiles/new.pos', $writer->posfile);
 
     throws_ok(sub { Log::Unrotate->new({ pos => $writer->posfile }) }, qr/log not specified/, "constructor dies if no log specified and pos file doesn't contain log name");
+}
+
+# autofix_cursor (3)
+{
+    my $writer = new LogWriter;
+    $writer->write("test1");
+    $writer->write("test2");
+    $writer->write("test3");
+    my $reader = reader($writer);
+    $reader->read();
+    $reader->read();
+    $reader->commit();
+    my $logfile = $writer->logfile();
+    xecho("test4", $logfile);
+
+    my $warn = '';
+    {
+        local $SIG{__WARN__} = sub {
+            $warn .= shift();
+        };
+        $reader = reader($writer, { autofix_cursor => 1 });
+    }
+
+    is($reader->read(), "test4\n", 'autofix_cursor option caused posfile removal');
+    like($warn, qr/unable to find the log/, 'warning about broken posfile printed');
+    like($warn, qr{cleaning tfiles/test.pos}, 'warning about posfile cleaning printed');
 }
 
