@@ -1,3 +1,11 @@
+liblog-unrotate-perl (1.21) unstable; urgency=low
+
+  * bugfix: _find_log could hang forever because of negative
+    LogNumber values
+  * MANIFEST updated
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Tue, 27 Apr 2010 16:29:36 +0400
+
 liblog-unrotate-perl (1.20) unstable; urgency=low
 
   * position persistence logic moved to separate Cursor::* classes

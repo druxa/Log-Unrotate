@@ -2,6 +2,9 @@ bin/unrotate
 Build.PL
 Changes
 lib/Log/Unrotate.pm
+lib/Log/Unrotate/Cursor.pm
+lib/Log/Unrotate/Cursor/File.pm
+lib/Log/Unrotate/Cursor/Null.pm
 MANIFEST
 MANIFEST.SKIP
 META.yml

@@ -9,11 +9,11 @@ Log::Unrotate - Reader of rotated logs.
 
 =head1 VERSION
 
-Version 1.20
+Version 1.21
 
 =cut
 
-our $VERSION = '1.20';
+our $VERSION = '1.21';
 
 =head1 SYNOPSIS
 
@@ -356,6 +356,7 @@ sub _find_log ($$)
             my @stat = stat $self->{Handle};
             return 1 if $stat[7] > tell $self->{Handle};
             $self->{LogNumber}--;
+            return 0 if $self->{LogNumber} < 0;
             return 0 unless $self->_reopen(0);
         }
     }
