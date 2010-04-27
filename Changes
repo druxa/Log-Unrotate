@@ -1,5 +1,8 @@
 Revision history for Log-Unrotate
 
+1.22    Tue Apr 27, 2010
+        * one more bugfix, lag() could hang too
+
 1.21    Tue Apr 27, 2010
         * bugfix: _find_log could hang forever because of negative
           LogNumber values

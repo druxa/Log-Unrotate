@@ -1,3 +1,9 @@
+liblog-unrotate-perl (1.22) unstable; urgency=low
+
+  * one more bugfix, lag() could hang too
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Tue, 27 Apr 2010 18:01:50 +0400
+
 liblog-unrotate-perl (1.21) unstable; urgency=low
 
   * bugfix: _find_log could hang forever because of negative
