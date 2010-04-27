@@ -1,5 +1,8 @@
 Revision history for Log-Unrotate
 
+1.23    Wed Apr 28, 2010
+        * Test::NoWarnings in build_requires
+
 1.22    Tue Apr 27, 2010
         * one more bugfix, lag() could hang too
 

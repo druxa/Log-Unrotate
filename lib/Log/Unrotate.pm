@@ -9,11 +9,11 @@ Log::Unrotate - Reader of rotated logs.
 
 =head1 VERSION
 
-Version 1.22
+Version 1.23
 
 =cut
 
-our $VERSION = '1.22';
+our $VERSION = '1.23';
 
 =head1 SYNOPSIS
 
