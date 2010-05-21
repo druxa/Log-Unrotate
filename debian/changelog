@@ -1,3 +1,9 @@
+liblog-unrotate-perl (1.24) unstable; urgency=low
+
+  * using Dist::Zilla
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Fri, 21 May 2010 19:38:05 +0400
+
 liblog-unrotate-perl (1.23) unstable; urgency=low
 
   * Test::NoWarnings in build_requires

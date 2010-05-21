@@ -22,7 +22,7 @@ Log::Unrotate::Cursor::File - file keeping unrotate position
 
 use Fcntl qw(:flock);
 use Carp;
-use File::Temp;
+use File::Temp 0.15;
 use File::Basename;
 
 our %_lock_values = map { $_ => 1 } qw(none blocking nonblocking);

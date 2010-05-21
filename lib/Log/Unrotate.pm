@@ -3,17 +3,11 @@ package Log::Unrotate;
 use strict;
 use warnings;
 
+# ABSTRACT: Reader of rotated logs.
+
 =head1 NAME
 
 Log::Unrotate - Reader of rotated logs.
-
-=head1 VERSION
-
-Version 1.23
-
-=cut
-
-our $VERSION = '1.23';
 
 =head1 SYNOPSIS
 

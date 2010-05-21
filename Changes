@@ -1,5 +1,8 @@
 Revision history for Log-Unrotate
 
+{{$NEXT}}
+        * using Dist::Zilla
+
 1.23    Wed Apr 28, 2010
         * Test::NoWarnings in build_requires
 

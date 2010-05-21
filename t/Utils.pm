@@ -3,6 +3,12 @@ package t::Utils;
 use strict;
 use warnings;
 
+use Test::More;
+
+if ($^O =~ /MSWin|cygwin/) {
+    BAIL_OUT("OS unsupported");
+}
+
 use Carp;
 
 require Exporter;

@@ -7,3 +7,12 @@
 /_build
 /Build
 /META.yml
+/MYMETA.yml
+/.build
+/*.deb
+/*.dsc
+/*.build
+/*.changes
+/*.tar.gz
+/*.upload
+/*.asc
