@@ -1,6 +1,8 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+
+1.25    Thu Jun 03, 2010
         * log_number() and log_name() methods
         * -i mode in unrotate script
 
