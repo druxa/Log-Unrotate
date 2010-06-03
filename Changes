@@ -1,6 +1,8 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+        * log_number() and log_name() methods
+        * -i mode in unrotate script
 
 1.24    Fri May 21, 2010
         * using Dist::Zilla

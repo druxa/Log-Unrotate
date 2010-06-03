@@ -94,7 +94,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 74;
+use Test::More tests => 79;
 use Test::Exception;
 use Test::NoWarnings;
 use File::Copy qw();
@@ -686,5 +686,40 @@ sub reader ($;$) {
     is($reader->read(), "test4\n", 'autofix_cursor option caused posfile removal');
     like($warn, qr/unable to find the log/, 'warning about broken posfile printed');
     like($warn, qr{cleaning tfiles/test.pos}, 'warning about posfile cleaning printed');
+}
+
+# log_number (3)
+{
+    my $writer = new LogWriter;
+    $writer->write("test1");
+    $writer->write("test2");
+    $writer->write("test3");
+    my $reader = reader($writer);
+    $reader->read();
+    $reader->read();
+    $reader->commit();
+    is($reader->log_number, 0, 'log_number()');
+    $writer->rotate;
+    $writer->rotate;
+
+    TODO: {
+        local $TODO = 'log_number should be calculated dynamically';
+        is($reader->log_number, 2, 'log_number() after rotate, without object reconstruction');
+    }
+    $reader = reader($writer);
+    is($reader->log_number, 2, 'log_number() after rotate');
+}
+
+# log_name (2)
+{
+    my $writer = new LogWriter;
+    $writer->write("test1");
+    $writer->write("test2");
+    $writer->write("test3");
+    my $reader = reader($writer);
+    is($reader->log_name(), 'tfiles/test.log', 'log_name()');
+    $writer->rotate;
+    $reader = reader($writer);
+    is($reader->log_name(), 'tfiles/test.log', "log_name() don't contain log number");
 }
 

@@ -14,6 +14,7 @@ unrotate - reads lines from log using Log::Unrotate and given pos file
 unrotate [-n 5] [-c] file.pos [file.log]
 
   options:
+    -i              print all info about posfile
     -c              commit position file before exit
     -n LIMIT        read only LIMIT lines
 
@@ -29,8 +30,10 @@ use Pod::Usage;
 
 my $limit;
 my $commit;
+my $info;
 
 GetOptions(
+    'i'         => \$info,
     'n=i'       => \$limit,
     'c|commit'    => \$commit,
 ) or pod2usage(2);
@@ -43,6 +46,16 @@ my $reader = Log::Unrotate->new({
   log => $log,
   pos => $pos,
 });
+
+if ($info) {
+    my $lag = $reader->lag;
+    my $log_number = $reader->log_number;
+    my $log_name = $reader->log_name;
+    print "log: $log_name\n";
+    print "current log: $log_name".($log_number ? ".$log_number" : "")."\n";
+    print "lag: $lag\n";
+    exit;
+}
 
 my $processed = 0;
 while (my $line = $reader->read()) {

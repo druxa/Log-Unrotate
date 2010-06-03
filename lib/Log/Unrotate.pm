@@ -284,8 +284,7 @@ sub _reopen ($$;$$)
 
         my @stat = stat $FILE;
         return 0 if $from == 0 and $stat[7] < $position;
-        return 0 if $stat[7] == 0 and $self->{LogNumber} == 0 and $self->{end} eq 'fixed';
-        seek $FILE, $position, $from;
+        return 0 if $stat[7] == 0 and $self->{LogNumber} == 0 and $self->{end} eq 'fixed'; seek $FILE, $position, $from;
         $self->{Handle} = $FILE;
         $self->{Inode} = $stat[1];
         return 1;
@@ -450,6 +449,26 @@ sub lag ($)
 
     $lag -= tell $self->{Handle};
     return $lag;
+}
+
+=item B<< log_number() >>
+
+Get current log number.
+
+=cut
+sub log_number {
+    my ($self) = @_;
+    return $self->{LogNumber};
+}
+
+=item B<< log_name() >>
+
+Get current log name. Don't contain C<< .N >> postfix even if cursor points to old log file.
+
+=cut
+sub log_name {
+    my ($self) = @_;
+    return $self->{log};
 }
 
 =back
