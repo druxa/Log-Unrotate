@@ -94,7 +94,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 79;
+use Test::More tests => 82;
 use Test::Exception;
 use Test::NoWarnings;
 use File::Copy qw();
@@ -413,8 +413,7 @@ sub reader ($;$) {
     $writer->write_raw("test4");
     $reader = reader($writer);
     my $line = $reader->read();
-    is($line, "test2", "Read incomplete lines from rotated logs");
-    $reader->read();
+    is($line, "test3\n", "Skip incomplete lines from rotated logs");
     $line = $reader->read();
     is($line, undef, "Ignore incomplete line at the end of the last log");
     $reader->commit();
@@ -723,3 +722,23 @@ sub reader ($;$) {
     is($reader->log_name(), 'tfiles/test.log', "log_name() don't contain log number");
 }
 
+# missing log (3)
+TODO: {
+    local $TODO = 'missing logs are not supported yet';
+    my $writer = new LogWriter;
+    $writer->write('test1');
+    $writer->write('test2');
+
+    my $reader = reader($writer);
+    is($reader->read, "test1\n");
+    $reader->commit;
+    undef $reader;
+
+    $writer->rotate;
+    $writer->rotate;
+    $writer->write('test3');
+
+    $reader = reader($writer);
+    is($reader->read, "test2\n");
+    is($reader->read, "test3\n");
+}

@@ -41,6 +41,7 @@ use Carp;
 use IO::Handle;
 use Digest::MD5 qw(md5_hex);
 
+use Fcntl qw(SEEK_SET SEEK_CUR SEEK_END);
 use Log::Unrotate::Cursor::File;
 use Log::Unrotate::Cursor::Null;
 
@@ -226,6 +227,46 @@ sub new ($$)
     return $self;
 }
 
+sub _seek_end_pos ($$) {
+    my $self = shift;
+    my ($handle) = @_;
+
+    seek $handle, -1, SEEK_END;
+    read $handle, my $last_byte, 1;
+    if ($last_byte eq "\n") {
+        return tell $handle;
+    }
+
+    my $position = tell $handle;
+    while (1) {
+        # we have reached beginning of the file and haven't found "\n"
+        return 0 if $position == 0;
+
+        my $read_portion = 1024;
+        $read_portion = $position if ($position < $read_portion);
+        seek $handle, -$read_portion, SEEK_CUR;
+        my $data;
+        read $handle, $data, $read_portion;
+        if ($data =~ /\n(.*)\z/) { # match *last* \n
+            my $len = length $1;
+            seek $handle, $position, SEEK_SET;
+            return $position - $len;
+        }
+        seek $handle, -$read_portion, SEEK_CUR;
+        $position -= $read_portion;
+    }
+}
+
+sub _find_end_pos ($$) {
+    my $self = shift;
+    my ($handle) = @_;
+
+    my $tell = tell $handle;
+    my $end = $self->_seek_end_pos($handle);
+    seek $handle, $tell, SEEK_SET;
+    return $end;
+}
+
 sub _get_last_line ($) {
     my ($self) = @_;
     my $handle = $self->{Handle};
@@ -237,13 +278,12 @@ sub _get_last_line ($) {
         my $log = $self->_log_file($number);
         undef $handle; # need this to keep $self->{Handle} unmodified!
         open $handle, '<', $log or return ""; # missing prev log
-        seek $handle, 0, 2;
-        $position = tell $handle;
+        $position = $self->_seek_end_pos($handle);
     }
 
     my $backstep = 256; # 255 + "\n"
     $backstep = $position if $backstep > $position;
-    seek $handle, -$backstep, 1;
+    seek $handle, -$backstep, SEEK_CUR;
     my $last_line;
     read $handle, $last_line, $backstep;
     return $last_line;
@@ -262,7 +302,8 @@ sub _start($)
     my $self = shift;
     $self->{LogNumber} = 0;
     if ($self->{start} eq 'end') { # move to the end of file
-        $self->_reopen(0, 2);
+        $self->_reopen(0);
+        $self->_seek_end_pos($self->{Handle});
     } elsif ($self->{start} eq 'begin') { # move to the beginning of last file
         $self->_reopen(0);
     } elsif ($self->{start} eq 'first') { # find oldest file
@@ -273,18 +314,17 @@ sub _start($)
     }
 }
 
-sub _reopen ($$;$$)
+sub _reopen ($$)
 {
-    my ($self, $position, $from) = @_;
-    $from ||= 0;
+    my ($self, $position) = @_;
 
     my $log = $self->_log_file();
 
     if (open my $FILE, "<$log") {
-
         my @stat = stat $FILE;
-        return 0 if $from == 0 and $stat[7] < $position;
-        return 0 if $stat[7] == 0 and $self->{LogNumber} == 0 and $self->{end} eq 'fixed'; seek $FILE, $position, $from;
+        return 0 if $stat[7] < $position;
+        return 0 if $stat[7] == 0 and $self->{LogNumber} == 0 and $self->{end} eq 'fixed';
+        seek $FILE, $position, SEEK_SET;
         $self->{Handle} = $FILE;
         $self->{Inode} = $stat[1];
         return 1;
@@ -346,8 +386,9 @@ sub _find_log ($$)
         next if ($self->{check_inode} and $pos->{Inode} and $self->{Inode} and $pos->{Inode} ne $self->{Inode});
         next if ($self->{check_lastline} and $pos->{LastLine} and $pos->{LastLine} ne $self->_last_line());
         while () {
-            my @stat = stat $self->{Handle};
-            return 1 if $stat[7] > tell $self->{Handle};
+            # check if we're at the end of file
+            return 1 if $self->_find_end_pos($self->{Handle}) > tell $self->{Handle};
+
             return 0 if $self->{LogNumber} <= 0;
             $self->{LogNumber}--;
             return 0 unless $self->_reopen(0);
@@ -368,6 +409,17 @@ sub read($)
 {
     my ($self) = @_;
 
+    my $getline = sub {
+        my $fh = shift;
+        my $line = <$fh>;
+        return unless defined $line;
+        unless ($line =~ /\n$/) {
+            seek $fh, - length $line, SEEK_CUR;
+            return undef;
+        }
+        return $line;
+    };
+
     my $line;
     while (1) {
         my $FILE = $self->{Handle};
@@ -376,15 +428,9 @@ sub read($)
             my $position = tell $FILE;
             return if $position >= $self->{EOF};
         }
-        $line = <$FILE>;
+        $line = $getline->($FILE);
         last if defined $line;
         return unless $self->_find_log($self->position());
-    }
-
-    if ($line !~ /\n$/ and $self->lag() == 0) {
-        # incomplete line => backstep
-        seek $self->{Handle}, - length $line, 1;
-        return;
     }
 
     $self->{LastLine} = $line;
@@ -463,7 +509,7 @@ sub log_number {
 
 =item B<< log_name() >>
 
-Get current log name. Don't contain C<< .N >> postfix even if cursor points to old log file.
+Get current log name. Doesn't contain C<< .N >> postfix even if cursor points to old log file.
 
 =cut
 sub log_name {

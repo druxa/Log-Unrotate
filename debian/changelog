@@ -1,9 +1,15 @@
-liblog-unrotate-perl (1.25) UNRELEASED; urgency=low
+liblog-unrotate-perl (1.26) UNRELEASED; urgency=low
+
+  * ignore all incomplete lines in rotated logs
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Wed, 01 Feb 2012 22:08:34 +0400
+
+liblog-unrotate-perl (1.25) unstable; urgency=low
 
   * log_number() and log_name() methods
   * -i mode in unrotate script
 
- -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Thu, 03 Jun 2010 20:28:23 +0400
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Wed, 01 Feb 2012 22:08:31 +0400
 
 liblog-unrotate-perl (1.24) unstable; urgency=low
 
