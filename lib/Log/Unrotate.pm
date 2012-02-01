@@ -389,9 +389,11 @@ sub _find_log ($$)
             # check if we're at the end of file
             return 1 if $self->_find_end_pos($self->{Handle}) > tell $self->{Handle};
 
-            return 0 if $self->{LogNumber} <= 0;
-            $self->{LogNumber}--;
-            return 0 unless $self->_reopen(0);
+            while () {
+                return 0 if $self->{LogNumber} <= 0;
+                $self->{LogNumber}--;
+                last if $self->_reopen(0);
+            }
         }
     }
 
