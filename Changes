@@ -2,6 +2,7 @@ Revision history for Log-Unrotate
 
 {{$NEXT}}
         * ignore all incomplete lines in rotated logs
+        * fix missing logs handling
 
 1.25    Thu Jun 03, 2010
         * log_number() and log_name() methods
