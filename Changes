@@ -1,6 +1,8 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+
+1.26    Wed Feb 29, 2012
         * ignore all incomplete lines in rotated logs
         * fix missing logs handling
 
