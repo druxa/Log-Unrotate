@@ -425,14 +425,14 @@ sub read($)
     my $line;
     while (1) {
         my $FILE = $self->{Handle};
-        return unless defined $FILE;
+        return undef unless defined $FILE;
         if (defined $self->{EOF} and $self->{LogNumber} == 0) {
             my $position = tell $FILE;
-            return if $position >= $self->{EOF};
+            return undef if $position >= $self->{EOF};
         }
         $line = $getline->($FILE);
         last if defined $line;
-        return unless $self->_find_log($self->position());
+        return undef unless $self->_find_log($self->position());
     }
 
     $self->{LastLine} = $line;

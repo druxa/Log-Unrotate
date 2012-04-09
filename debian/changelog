@@ -1,6 +1,7 @@
 liblog-unrotate-perl (1.27) UNRELEASED; urgency=low
 
   * don't fail when log is empty and start => 'end'
+  * read returns undef in the list context
 
  -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Mon, 09 Apr 2012 20:43:44 +0400
 
