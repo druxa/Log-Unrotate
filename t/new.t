@@ -94,7 +94,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 82;
+use Test::More tests => 83;
 use Test::Exception;
 use Test::NoWarnings;
 use File::Copy qw();
@@ -502,10 +502,15 @@ sub reader ($;$) {
 # start flag (3)
 {
     my $writer = LogWriter->new;
+    $writer->touch();
+
+    my $reader = reader($writer, { start => 'end' });
+    is(scalar($reader->read), undef, "start => 'end' and the empty file");
+
     $writer->write("test1");
     $writer->rotate();
     $writer->write("test2");
-    my $reader = reader($writer, {start => "begin"});
+    $reader = reader($writer, {start => "begin"});
     my $line = $reader->read();
     is($line, "test2\n", "start => 'begin' interpreted properly");
     $reader = reader($writer, {start => "first"});

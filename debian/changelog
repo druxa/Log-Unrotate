@@ -1,3 +1,9 @@
+liblog-unrotate-perl (1.27) UNRELEASED; urgency=low
+
+  * don't fail when log is empty and start => 'end'
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Mon, 09 Apr 2012 20:43:44 +0400
+
 liblog-unrotate-perl (1.26) unstable; urgency=low
 
   * ignore all incomplete lines in rotated logs

@@ -303,7 +303,7 @@ sub _start($)
     $self->{LogNumber} = 0;
     if ($self->{start} eq 'end') { # move to the end of file
         $self->_reopen(0);
-        $self->_seek_end_pos($self->{Handle});
+        $self->_seek_end_pos($self->{Handle}) if $self->{Handle};
     } elsif ($self->{start} eq 'begin') { # move to the beginning of last file
         $self->_reopen(0);
     } elsif ($self->{start} eq 'first') { # find oldest file
