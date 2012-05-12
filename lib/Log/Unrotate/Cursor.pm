@@ -46,6 +46,18 @@ sub clean($) {
     die 'not implemented';
 }
 
+=item B<rollback()>
+
+Rollback cursor to some previous value.
+
+Returns 1 on success, 0 on fail.
+
+=cut
+
+sub rollback($) {
+    return 0;
+}
+
 =back
 
 =head1 AUTHOR
