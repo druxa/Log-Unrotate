@@ -55,6 +55,7 @@ sub _defaults ($) {
         check_lastline => 1,
         check_log => 0,
         autofix_cursor => 0,
+        rollback_period => 300,
     };
 }
 
@@ -187,7 +188,7 @@ sub new ($$)
         }
         else {
             croak "Log not specified and posfile is not found" if not defined $self->{log} and not -e $posfile;
-            $self->{cursor} = Log::Unrotate::Cursor::File->new($posfile, { lock => $self->{lock} });
+            $self->{cursor} = Log::Unrotate::Cursor::File->new($posfile, { lock => $self->{lock}, rollback_period => $self->{rollback_period} });
         }
     }
 

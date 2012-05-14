@@ -9,11 +9,14 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 100;
+use Test::More tests => 115;
 use Test::NoWarnings;
 use t::Utils;
 
+my $time = time;
+
 BEGIN {
+    *CORE::GLOBAL::time = sub() { return $time };
     use_ok('Log::Unrotate::Cursor::File');
 }
 
@@ -48,7 +51,7 @@ sub default_pos (;$) {
 }
 
 sub fields {
-    return qw/Position LogFile Inode LastLine/;
+    return qw/Position LogFile Inode LastLine CommitTime/;
 }
 
 # locks are tested in t/new.t
@@ -74,7 +77,7 @@ sub fields {
     is($pos, undef, "Read after clean");
 }
 
-# commit & read (6)
+# commit & read (7)
 {
     my $c = cursor();
     my $def_pos = default_pos();
@@ -111,13 +114,13 @@ sub fields {
     my $pos = $c->read();
 
     ok(defined $pos, "Read commited position");
-    for my $field (fields(), 'CommitTime') {
+    for my $field (fields()) {
         is($pos->{$field}, $def_pos->{$field}, "Read commited '$field' value");
     }
     my @extra_fields = ();
     for my $field (keys %$pos) {
         push @extra_fields, $field
-            unless (grep { $field eq $_ } (fields(), 'CommitTime'));
+            unless (grep { $field eq $_ } fields());
     }
     is(scalar @extra_fields, 0, "No extra fields in position")
         or diag "Extra fields: @extra_fields";
@@ -132,19 +135,19 @@ sub fields {
     my $pos = $c->read();
 
     ok(defined $pos, "Read commited position");
-    for my $field ((fields(), 'CommitTime')) {
+    for my $field (fields()) {
         is($pos->{$field}, $def_pos->{$field}, "Read commited '$field' value");
     }
     my @extra_fields = ();
     for my $field (keys %$pos) {
         push @extra_fields, $field
-            unless (grep { $field eq $_ } (fields(), 'CommitTime'));
+            unless (grep { $field eq $_ } fields());
     }
     is(scalar @extra_fields, 0, "No extra fields in position")
         or diag "Extra fields: @extra_fields";
 }
 
-# 2 commits (5)
+# 2 commits (6)
 {
     my $c = cursor();
 
@@ -204,26 +207,40 @@ sub fields {
     is($c->read(), undef, "Position after clean and failed rollback");
 }
 
-# rollback to previous commit (6)
+# rollback to previous commit (19)
 {
     my $c = cursor({rollback_period => 5});
 
-    $c->commit(default_pos);
-    is($c->read()->{Position}, 100, "Position after first commit");
-
-    $c->commit(default_pos({
+    my $pos1 = default_pos;
+    my $pos2 = default_pos({
         Position => 110,
         CommitTime => time - 3,
-    }));
+    });
+
+    $c->commit($pos1);
+    is($c->read()->{Position}, 100, "Position after first commit");
+
+    $c->commit($pos2);
     is($c->read()->{Position}, 110, "Position after second commit");
+
+    my $pos = $c->read();
+    for my $field (fields()) {
+        is($pos->{$field}, $pos2->{$field}, "Read commited '$field' value");
+    }
 
     my $res = $c->rollback();
     is($res, 1, "Rollback done");
-    is($c->read()->{Position}, 100, "Position after rollback");
+    $pos = $c->read();
+    for my $field (fields()) {
+        is($pos->{$field}, $pos1->{$field}, "Read commited '$field' value");
+    }
 
     $res = $c->rollback();
     is($res, 0, "Rollback failed");
-    is($c->read()->{Position}, 100, "Position after failed rollback");
+    $pos = $c->read();
+    for my $field (fields()) {
+        is($pos->{$field}, $pos1->{$field}, "Read commited '$field' value");
+    }
 }
 
 # rollback and new commit (11)
@@ -356,7 +373,7 @@ sub fields {
                 CommitTime => time,
             }));
         }
-        sleep 2 unless $i == 5;
+        $time += 2 unless $i == 5;
     }
 
     my $res = $c1->rollback();
@@ -411,5 +428,4 @@ sub fields {
     is($res, 0, "Rollback failed");
     is($c11->read()->{Position}, 0, "c11 Position after failed rollback");
 }
-
 

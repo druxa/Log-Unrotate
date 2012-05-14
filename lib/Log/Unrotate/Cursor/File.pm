@@ -24,7 +24,6 @@ use Fcntl qw(:flock);
 use Carp;
 use File::Temp 0.15;
 use File::Basename;
-use File::Copy;
 
 our %_lock_values = map { $_ => 1 } qw(none blocking nonblocking);
 our %_text2field = (
@@ -55,7 +54,7 @@ sub new {
     croak "No file specified" unless defined $file;
 
     my $lock = 'none';
-    my $rollback = undef;
+    my $rollback;
     if ($options) {
         $lock = $options->{lock};
         $rollback = $options->{rollback_period};
@@ -81,6 +80,9 @@ sub new {
             flock $self->{lock_fh}, LOCK_EX | LOCK_NB or croak "Failed to obtain lock: $!";
         }
     }
+
+    $self->{positions} = $self->_read_file_fully();
+
     return $self;
 }
 
@@ -125,20 +127,19 @@ sub _read_file_fully {
 
 sub read {
     my $self = shift;
-
-    my $res = $self->_read_file_fully();
-
-    return undef unless defined $res;
-    return $res->[0];
+    return undef unless defined $self->{positions};
+    return {%{$self->{positions}->[0]}};
 }
 
-sub _write_file_fully {
+sub _save_positions {
     my ($self, $poss) = @_;
+
+    $self->{positions} = [ map { {%$_} } @$poss ];
 
     my $fh = File::Temp->new(DIR => dirname($self->{file}));
 
     my $first = 1;
-    for my $pos (@$poss) {
+    for my $pos (@{$self->{positions}}) {
         $fh->print("###\n") unless $first;
         $first = 0;
         $fh->print("logfile: $pos->{LogFile}\n");
@@ -149,10 +150,16 @@ sub _write_file_fully {
         if ($pos->{LastLine}) {
             $fh->print("lastline: $pos->{LastLine}\n");
         }
-        if ($self->{rollback}) {
-            $pos->{CommitTime} ||= time;
-            $fh->print("committime: $pos->{CommitTime}\n");
+        $pos->{CommitTime} ||= time;
+        $fh->print("committime: $pos->{CommitTime}\n");
+
+        my @to_clean;
+        for my $field (keys %$pos) {
+            unless (grep { $_ eq $field } values %_text2field) {
+                push @to_clean, $field;
+            }
         }
+        delete @{$pos}{@to_clean} if (scalar @to_clean);
     }
     $fh->flush;
     if ($fh->error) {
@@ -164,21 +171,14 @@ sub _write_file_fully {
     $fh->unlink_on_destroy(0);
 }
 
-sub _write_file {
-    my ($self, $pos) = @_;
-
-    return $self->_write_file_fully([$pos]);
-}
-
 sub _commit_with_backups($$) {
     my ($self, $pos) = @_;
 
     my $time = time;
 
-    my $poss = $self->_read_file_fully();
-
+    my $poss = $self->{positions};
     unless ($poss) {
-        $self->_write_file($pos);
+        $self->_save_positions([$pos]);
         return;
     }
 
@@ -192,7 +192,7 @@ sub _commit_with_backups($$) {
     } elsif ($times[1] > $self->{rollback}) {
         @new_poss = ($pos, $poss->[0], $poss->[1]);
     }
-    $self->_write_file_fully(\@new_poss);
+    $self->_save_positions(\@new_poss);
 }
 
 sub commit($$) {
@@ -201,23 +201,17 @@ sub commit($$) {
     return unless defined $pos->{Position}; # pos is missing and log either => do nothing
     return $self->_commit_with_backups($pos) if ($self->{rollback});
 
-    $self->_write_file($pos);
+    $self->_save_positions([$pos]);
 }
 
 sub rollback {
     my ($self) = @_;
     return 0 unless $self->{rollback};
 
-    my $file = $self->{file};
+    return 0 unless $self->{positions};
+    return 0 unless scalar @{$self->{positions}} > 1;
 
-    return 0 unless -e $file;
-
-    my $poss = $self->_read_file_fully();
-    return 0 unless $poss;
-    return 0 unless scalar @$poss > 1;
-
-    shift @$poss;
-    $self->_write_file_fully($poss);
+    shift @{$self->{positions}};
     return 1;
 }
 
@@ -225,6 +219,7 @@ sub clean($) {
     my ($self) = @_;
     return unless -e $self->{file};
     unlink $self->{file} or die "Can't remove $self->{file}: $!";
+    $self->{positions} = undef;
 }
 
 sub DESTROY {
