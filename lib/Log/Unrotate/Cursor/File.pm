@@ -27,6 +27,13 @@ use File::Basename;
 use File::Copy;
 
 our %_lock_values = map { $_ => 1 } qw(none blocking nonblocking);
+our %_text2field = (
+    position => 'Position',
+    logfile => 'LogFile',
+    inode => 'Inode',
+    lastline => 'LastLine',
+    committime => 'CommitTime',
+);
 
 =over
 
@@ -77,54 +84,75 @@ sub new {
     return $self;
 }
 
-sub _read_file {
-    my ($self, $file) = @_;
+sub _read_file_fully {
+    my ($self) = @_;
 
+    my $file = $self->{file};
     return unless -e $file;
 
     open my $fh, '<', $file or die "Can't open '$file': $!";
-    my $pos = {};
     my $content = do {local $/; <$fh>};
-    $content =~ /position:\s*(\d+)/ and $pos->{Position} = $1;
-    die "missing 'position:' in $file" unless defined $pos->{Position};
-    $content =~ /inode:\s*(\d+)/ and $pos->{Inode} = $1;
-    $content =~ /lastline:\s(.*)/ and $pos->{LastLine} = $1;
-    $content =~ /logfile:\s(.*)/ and $pos->{LogFile} = $1;
-    $content =~ /time:\s*(\d+)/ and $pos->{CommitTime} = $1;
-    return $pos;
+
+    my @poss = ();
+    my $pos = {};
+    for my $line (split /\n/, $content) {
+        if ($line =~ /^\s*(inode|committime|position):\s*(\d+)/) {
+            my $field = $_text2field{$1};
+            if (defined $pos->{$field}) {
+                die "Some pos-file inconsistency: '$field' defined twice";
+            }
+            $pos->{$field} = $2;
+        } elsif ($line =~ /^\s*(logfile|lastline):\s(.*)/) {
+            my $field = $_text2field{$1};
+            if (defined $pos->{$field}) {
+                die "Some pos-file inconsistency: '$field' defined twice";
+            }
+            $pos->{$field} = $2;
+        } elsif ($line =~ /^###$/) {
+            die "missing 'position:' in $file" unless defined $pos->{Position};
+            push @poss, $pos;
+            $pos = {};
+        }
+    }
+    if ($pos && scalar keys %$pos) {
+        die "missing 'position:' in $file" unless defined $pos->{Position};
+        push @poss, $pos;
+    }
+    die "missing 'position:' in $file" unless scalar @poss;
+
+    return \@poss;
 }
 
 sub read {
     my $self = shift;
 
-    return $self->_read_file($self->{file});
+    my $res = $self->_read_file_fully();
+
+    return undef unless defined $res;
+    return $res->[0];
 }
 
-sub commit($$) {
-    my ($self, $pos) = @_;
-
-    return unless defined $pos->{Position}; # pos is missing and log either => do nothing
-    return $self->_commit_with_backups($pos) if ($self->{rollback});
-
-    $self->_write_pos_file($pos);
-}
-
-sub _write_pos_file {
-    my ($self, $pos) = @_;
+sub _write_file_fully {
+    my ($self, $poss) = @_;
 
     my $fh = File::Temp->new(DIR => dirname($self->{file}));
 
-    $fh->print("logfile: $pos->{LogFile}\n");
-    $fh->print("position: $pos->{Position}\n");
-    if ($pos->{Inode}) {
-        $fh->print("inode: $pos->{Inode}\n");
-    }
-    if ($pos->{LastLine}) {
-        $fh->print("lastline: $pos->{LastLine}\n");
-    }
-    if ($self->{rollback}) {
-        $pos->{CommitTime} ||= time;
-        $fh->print("time: $pos->{CommitTime}\n");
+    my $first = 1;
+    for my $pos (@$poss) {
+        $fh->print("###\n") unless $first;
+        $first = 0;
+        $fh->print("logfile: $pos->{LogFile}\n");
+        $fh->print("position: $pos->{Position}\n");
+        if ($pos->{Inode}) {
+            $fh->print("inode: $pos->{Inode}\n");
+        }
+        if ($pos->{LastLine}) {
+            $fh->print("lastline: $pos->{LastLine}\n");
+        }
+        if ($self->{rollback}) {
+            $pos->{CommitTime} ||= time;
+            $fh->print("committime: $pos->{CommitTime}\n");
+        }
     }
     $fh->flush;
     if ($fh->error) {
@@ -136,33 +164,44 @@ sub _write_pos_file {
     $fh->unlink_on_destroy(0);
 }
 
+sub _write_file {
+    my ($self, $pos) = @_;
+
+    return $self->_write_file_fully([$pos]);
+}
+
 sub _commit_with_backups($$) {
     my ($self, $pos) = @_;
 
     my $time = time;
-    my @times = ();
-    my $old_pos = $self->read();
-    if ($old_pos) {
-        push @times,  $time - ($old_pos->{CommitTime} || $time);
-        my $step = 1;
-        while ($old_pos = $self->_read_file("$self->{file}.$step")) {
-            push @times, $time - ($old_pos->{CommitTime} || $time);
-            $step++;
-        }
+
+    my $poss = $self->_read_file_fully();
+
+    unless ($poss) {
+        $self->_write_file($pos);
+        return;
     }
 
-    if (scalar @times) {
-        if ($times[0] > $self->{rollback} || scalar @times == 1) {
-            unlink("$self->{file}.*") if scalar @times > 1;
-            copy($self->{file}, "$self->{file}.1");
-        } elsif ($times[1] <= $self->{rollback}) {
-
-        } elsif ($times[1] > $self->{rollback}) {
-            copy("$self->{file}.1", "$self->{file}.2");
-            copy($self->{file}, "$self->{file}.1");
-        }
+    my @times = map { $time - ($_->{CommitTime} || $time) } @$poss;
+    my @new_poss = ();
+    if ($times[0] > $self->{rollback} || scalar @times == 1) {
+        @new_poss = ($pos, $poss->[0]);
+    } elsif ($times[1] <= $self->{rollback}) {
+        @new_poss = @$poss;
+        $new_poss[0] = $pos;
+    } elsif ($times[1] > $self->{rollback}) {
+        @new_poss = ($pos, $poss->[0], $poss->[1]);
     }
-    $self->_write_pos_file($pos);
+    $self->_write_file_fully(\@new_poss);
+}
+
+sub commit($$) {
+    my ($self, $pos) = @_;
+
+    return unless defined $pos->{Position}; # pos is missing and log either => do nothing
+    return $self->_commit_with_backups($pos) if ($self->{rollback});
+
+    $self->_write_file($pos);
 }
 
 sub rollback {
@@ -172,13 +211,13 @@ sub rollback {
     my $file = $self->{file};
 
     return 0 unless -e $file;
-    return 0 unless -e "$file.1";
 
-    rename("$file.1", $file);
-    for my $step ( sort { $a <=> $b } map {$_ =~ /\.(\d+)$/; $1} glob "$file.*" ) {
-        rename("$file.$step", "$file.".($step - 1));
-    }
+    my $poss = $self->_read_file_fully();
+    return 0 unless $poss;
+    return 0 unless scalar @$poss > 1;
 
+    shift @$poss;
+    $self->_write_file_fully($poss);
     return 1;
 }
 

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 93;
+use Test::More tests => 100;
 use Test::NoWarnings;
 use t::Utils;
 
@@ -21,6 +21,9 @@ sub cursor (;$) {
     my ($opts) = @_;
     $opts ||= {};
     my $file = delete $opts->{file} || 'tfiles/cursor.pos';
+    my $no_clean = delete $opts->{no_clean};
+
+    unlink $file unless $no_clean;
 
     return Log::Unrotate::Cursor::File->new(
         $file, {
@@ -87,6 +90,34 @@ sub fields {
     for my $field (keys %$pos) {
         push @extra_fields, $field
             unless (grep { $field eq $_ } fields());
+    }
+    is(scalar @extra_fields, 0, "No extra fields in position")
+        or diag "Extra fields: @extra_fields";
+}
+
+# commit & read buggy (7)
+{
+    my $c = cursor({rollback_period => 5});
+    my $def_pos = {
+        Position => 100,
+        LogFile => "'position:120'",
+        Inode => 123,
+        CommitTime => 456,
+        LastLine => "position:130 logfile:some.log committime:678 inode:901 lastline:other line",
+        SomeField => "some value",
+    };
+    $c->commit($def_pos);
+
+    my $pos = $c->read();
+
+    ok(defined $pos, "Read commited position");
+    for my $field (fields(), 'CommitTime') {
+        is($pos->{$field}, $def_pos->{$field}, "Read commited '$field' value");
+    }
+    my @extra_fields = ();
+    for my $field (keys %$pos) {
+        push @extra_fields, $field
+            unless (grep { $field eq $_ } (fields(), 'CommitTime'));
     }
     is(scalar @extra_fields, 0, "No extra fields in position")
         or diag "Extra fields: @extra_fields";
