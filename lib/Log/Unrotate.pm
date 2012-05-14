@@ -210,6 +210,14 @@ sub new ($$)
             $self->_find_log($pos);
             1;
         };
+        while (!$found) {
+            last unless $self->{cursor}->rollback();
+            $pos = $self->{cursor}->read();
+            $found = eval {
+                $self->_find_log($pos);
+                1;
+            };
+        }
         unless ($found) {
             if ($self->{autofix_cursor}) {
                 warn $@;

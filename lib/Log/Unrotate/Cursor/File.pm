@@ -206,7 +206,6 @@ sub commit($$) {
 
 sub rollback {
     my ($self) = @_;
-    return 0 unless $self->{rollback};
 
     return 0 unless $self->{positions};
     return 0 unless scalar @{$self->{positions}} > 1;

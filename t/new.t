@@ -94,7 +94,7 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 87;
+use Test::More tests => 99;
 use Test::Exception;
 use Test::NoWarnings;
 use File::Copy qw();
@@ -759,4 +759,57 @@ sub reader ($;$) {
     $reader = reader($writer);
     is($reader->read, "test2\n");
     is($reader->read, "test3\n");
+}
+
+# log problems, use position backup (7)
+{
+    my $writer = LogWriter->new;
+    $writer->write('test1');
+    $writer->rotate;
+    $writer->write('test2');
+    $writer->rotate;
+    $writer->write('test3');
+
+    my $reader = reader($writer, {start => 'first'});
+    is($reader->read, "test1\n");
+    $reader->commit;
+    is($reader->read, "test2\n");
+    $reader->commit;
+
+    unlink($reader->log_name().".1");
+
+    throws_ok(sub { $reader->read }, qr/unable to find/, "Cannot continue reading");
+
+    lives_ok( sub { $reader = reader($writer) }, "Create reader");
+    lives_and( sub { is($reader->read, "test3\n") }, "Read after reopen and fix cursor");
+
+    lives_ok( sub { $reader = reader($writer, { rollback_period => 0}) },
+        "Create reader (rollback_period = 0)");
+    lives_and( sub { is($reader->read, "test3\n") },
+        "Read after reopen and fix cursor (even if rollback_period == 0)");
+}
+
+# log problems, cannot use position backup (5)
+{
+    my $writer = LogWriter->new;
+    $writer->write('test1');
+    $writer->rotate;
+    $writer->write('test2');
+    $writer->rotate;
+    $writer->write('test3');
+
+    my $reader = reader($writer, {start => 'first', rollback_period => 0});
+    is($reader->read, "test1\n");
+    $reader->commit;
+    is($reader->read, "test2\n");
+    $reader->commit;
+
+    unlink($reader->log_name().".1");
+
+    throws_ok(sub { $reader->read }, qr/unable to find/, "Cannot continue reading");
+
+    throws_ok( sub { $reader = reader($writer) }, qr/unable to find/, "Create reader");
+
+    throws_ok( sub { $reader = reader($writer, { rollback_period => 0}) }, qr/unable to find/,
+        "Create reader (rollback_period = 0)");
 }
