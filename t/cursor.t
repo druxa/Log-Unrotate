@@ -364,8 +364,6 @@ sub fields {
     my $c9 = cursor({rollback_period => 9, file => 'tfiles/c9.pos',});
     my $c11 = cursor({rollback_period => 11, file => 'tfiles/c11.pos',});
 
-    diag "Now commiting with sleeps (10s)";
-
     for my $i (0 .. 5) {
         for my $c ($c1, $c3, $c5, $c9, $c11) {
             $c->commit(default_pos({
