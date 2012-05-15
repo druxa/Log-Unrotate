@@ -1,6 +1,9 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+        * autofix pos-files using rollback
+        * fix problem with pos-file parsing regexps
+        * cursor tests
 
 1.27    Mon Apr 09, 2012
         * don't fail when log is empty and start => 'end'

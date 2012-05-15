@@ -90,6 +90,13 @@ Recreate cursor if it's broken.
 
 Warning will be printed. This option is dangerous and shouldn't be enabled light-heartedly.
 
+=item I<rollback_period>
+
+Time period in seconds. When > 0 tells C<commit> method to save some positions history (at least one previous position older then I<rollback_period> would be preserved) 
+to allow recovery when the last position is somewhy broken. Position may sometimes become invalid because of machine hard reboot.
+
+The feature is enabled by default (value 300), set to 0 to disable.
+
 =item I<log>
 
 Name of log file. Value '-' means standard input stream.
