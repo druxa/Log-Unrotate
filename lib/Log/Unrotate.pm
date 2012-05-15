@@ -206,27 +206,25 @@ sub new ($$)
     $self->_set_eof();
 
     if ($pos) {
-        my $found = eval {
-            $self->_find_log($pos);
-            1;
-        };
-        while (!$found) {
+        my $error;
+        while () {
+            eval {
+                $self->_find_log($pos);
+            };
+            $error = $@;
+            last unless $error;
             last unless $self->{cursor}->rollback();
             $pos = $self->{cursor}->read();
-            $found = eval {
-                $self->_find_log($pos);
-                1;
-            };
         }
-        unless ($found) {
+        if ($error) {
             if ($self->{autofix_cursor}) {
-                warn $@;
+                warn $error;
                 warn "autofix_cursor is enabled, cleaning $self->{cursor}";
                 $self->{cursor}->clean();
                 $self->_start();
             }
             else {
-                die $@;
+                die $error;
             }
         }
     } else {
