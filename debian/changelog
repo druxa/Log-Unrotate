@@ -1,3 +1,9 @@
+liblog-unrotate-perl (1.29) unstable; urgency=low
+
+  * speed up read() by 30%
+
+ -- Vyacheslav Matjukhin (No comments) <mmcleric@yandex-team.ru>  Tue, 07 May 2013 18:56:13 +0400
+
 liblog-unrotate-perl (1.28) unstable; urgency=low
 
   * autofix pos-files using rollback
