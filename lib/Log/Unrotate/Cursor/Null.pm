@@ -5,7 +5,7 @@ use warnings;
 
 =head1 NAME
 
-Log::Unrotate::Cursor::Null - dummy cursor
+Log::Unrotate::Cursor::Null - dummy unrotate cursor
 
 =head1 DESCRIPTION
 
@@ -23,7 +23,7 @@ use overload '""' => sub { 'Null' };
 
 =item B<new()>
 
-Create null cursor.
+Create a null cursor.
 
 =cut
 sub new {
@@ -39,4 +39,3 @@ sub commit { return }
 sub clean { return }
 
 1;
-

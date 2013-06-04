@@ -3,11 +3,9 @@ package Log::Unrotate;
 use strict;
 use warnings;
 
-# ABSTRACT: Reader of rotated logs.
-
 =head1 NAME
 
-Log::Unrotate - Reader of rotated logs.
+Log::Unrotate - Incremental log reader with a transparent rotation handling
 
 =head1 SYNOPSIS
 
@@ -18,21 +16,29 @@ Log::Unrotate - Reader of rotated logs.
       pos => 'xxx.pos',
   });
 
-  $reader->read();
-  $reader->read();
-  $reader->read();
-  $reader->commit();
+  my $line = $reader->read();
+  my $another_line = $reader->read();
+
+  $reader->commit(); # serialize the position on disk into 'pos' file
+
   my $position = $reader->position();
   $reader->read();
   $reader->read();
   $reader->commit($position); # rollback the last 2 reads
+
   my $lag = $reader->lag();
 
 =head1 DESCRIPTION
 
-The C<Log::Unrotate> is a class that implements incremental and transparent reading of a log file which correctly handles logrotates.
+C<Log::Unrotate> allows you to read any log file incrementally and transparently.
 
-It tries really hard to never skip any data from logs. If it's not sure about what to do, it fails, and you should either fix your position file manually, or remove it completely.
+B<Incrementally> means that you can store store the reading position to the special file ("pos-file") using C<commit()>, restart the process, and then continue from where you left.
+
+B<Transparently> means that C<Log::Unrotate> automatically jumps from one log to the next. For example, if you were reading I<foo.log>, then stored the position and left for a day, and then while you were away, I<foo.log> got renamed to I<foo.log.1>, while the new I<foo.log> got some new content in it, C<Log::Unrotate> will find the right log and give you the remaining lines from I<foo.log.1> before moving to I<foo.log>.
+
+Even better, it will do the right thing even if the log rotation happens while you were reading the log.
+
+C<Log::Unrotate> tries really hard to never skip any data from logs. If it's not sure about what to do, it throws an exception. This is an extremely rare situation, and it is a good default for building a simple and robust message queue on top of this class, but if you prefer a quick-and-dirty recovering, you can enable I<autofix_cursor> option.
 
 =cut
 
@@ -70,46 +76,47 @@ our %_end_values = map { $_ => 1 } qw(fixed future);
 
 =item B<< new($params) >>
 
-Creates new unrotate object.
+Creates the new unrotate object.
 
 =over
 
 =item I<pos>
 
-Name of file to store log reading position. Will be created automatically if missing.
+Name of a file to store log reading position. Will be created automatically if missing.
 
-Value '-' means not use position file. I.e., pretend it doesn't exist at start and ignore commit calls.
+Value '-' means not to use a position file. I.e., pretend it doesn't exist at the start and ignore commit calls.
 
 =item I<cursor>
 
-Instead of C<pos> file, you can specify any custom cursor. See C<Log::Unrotate::Cursor> for cursor API details.
+Instead of C<pos> file, you can specify any custom cursor. See C<Log::Unrotate::Cursor> for the cursor API details.
 
 =item I<autofix_cursor>
 
-Recreate cursor if it's broken.
+Recreate a cursor if it's broken.
 
-Warning will be printed. This option is dangerous and shouldn't be enabled light-heartedly.
+Warning will be printed on recovery.
 
 =item I<rollback_period>
 
-Time period in seconds. When > 0 tells C<commit> method to save some positions history (at least one previous position older then I<rollback_period> would be preserved) 
-to allow recovery when the last position is somewhy broken. Position may sometimes become invalid because of machine hard reboot.
+Time period in seconds.
+If I<rollback_period> is greater than 0, C<commit> method will save some positions history (at least one previous position older then I<rollback_period> would be preserved)
+to allow recovery when the last position is broken for some reason. (Position may sometimes become invalid because of the host's hard reboot.)
 
-The feature is enabled by default (value 300), set to 0 to disable.
+The feature is enabled by default (with value 300), set to 0 to disable, or set to some greater value if your heavily-loaded host is not flushing its filesystem buffers on disk this often.
 
 =item I<log>
 
-Name of log file. Value '-' means standard input stream.
+Name of a log file. Value C<-> means standard input stream.
 
 =item I<start>
 
-Describes behavior when position file doesn't exist. Allowed values: C<begin> (default), C<end>, C<first>.
+Describes the initialization behavior of new cursors. Allowed values: C<begin> (default), C<end>, C<first>.
 
 =over 4
 
 =item *
 
-When I<start> is C<begin>, we'll read current I<log> from beginning.
+When I<start> is C<begin>, we'll read current I<log> from the beginning.
 
 =item *
 
@@ -117,51 +124,53 @@ When I<start> is C<end>, we'll put current position in C<log> at the end (useful
 
 =item *
 
-When I<start> is C<first>, C<Log::Unrotate> will find oldest log file and read everything.
+When I<start> is C<first>, C<Log::Unrotate> will start from the oldest log file available.
 
 =back
 
+I.e., if there are I<foo.log>, I<foo.log.1>, and I<foo.log.2>, C<begin> will start from the top of I<foo.log>, C<end> will skip to the bottom of I<foo.log>, while C<first> will start from the top of I<foo.log.2>.
+
 =item I<end>
 
-Describes behavior when the log is asynchronously appended while read. Allowed values: C<fixed> (default), C<future>.
+Describes the reading behavior when we reach the end of a log. Allowed values: C<fixed> (default), C<future>.
 
 =over 4
 
 =item *
 
-When I<end> is C<fixed>, the log is read up to the position it had when the reader object was created.
+When I<end> is C<fixed>, the log is read up to the position where it ended when the reader object was created. This is the default, so you don't wait in a reading loop indefinitely because somebody keeps adding new lines to the log.
 
 =item *
 
-When I<end> is C<future>, it allows reading the part of the log that was appended after the reader creation (useful for reading from stdin).
+When I<end> is C<future>, it allows the reading of the part of the log that was appended after the reader was created (useful for reading from stdin).
 
 =back
 
 =item I<lock>
 
-Describes locking behaviour. Allowed values: C<none> (default), C<blocking>, C<nonblocking>.
+Describes the locking behaviour. Allowed values: C<none> (default), C<blocking>, C<nonblocking>.
 
 =over 4
 
 =item *
 
-When I<lock> is C<blocking>, lock named I<pos>.lock will be acquired in blocking mode.
+When I<lock> is C<blocking>, lock named I<pos>.lock will be acquired in the blocking mode.
 
 =item *
 
-When I<lock> is C<nonblocking>, lock named I<pos>.lock will be acquired in nonblocking mode; if lock file is already locked, exception will be thrown.
+When I<lock> is C<nonblocking>, lock named I<pos>.lock will be acquired in the nonblocking mode; if lock file is already locked, exception will be raised.
 
 =back
-
-=item I<check_inode>
-
-This flag is disabled by default.
-
-It enables inode checks when detecting log rotations. This option should not be enabled when retrieving logs via rsync or some other way which modifies inodes.
 
 =item I<check_lastline>
 
 This flag is set by default. It enables content checks when detecting log rotations. There is actually no reason to disable this option.
+
+=item I<check_inode>
+
+Enable inode checks when detecting log rotations. This option should not be enabled when retrieving logs via rsync or some other way which modifies inodes.
+
+This flag is disabled by default, because I<check_lastline> is superior and should be enough for finding the right file.
 
 =back
 
@@ -418,7 +427,7 @@ sub _find_log ($$)
 
 =item B<< read() >>
 
-Read a string from the file I<log>.
+Read a line from the log file.
 
 =cut
 sub read {
@@ -448,7 +457,7 @@ sub read {
 
 =item B<< position() >>
 
-Get your current position in I<log> as an object passible to commit.
+Get your current position in I<log> as an object passible to C<commit()>.
 
 =cut
 sub position($)
@@ -466,11 +475,13 @@ sub position($)
     return $pos;
 }
 
-=item B<< commit(;$) >>
+=item B<< commit() >>
 
-Save current position in the file I<pos>. You can also save some other position, previosly taken with B<position>.
+=item B<< commit($position) >>
 
-Position file gets commited using temporary file, so it'll not be lost if disk space is depleted.
+Save the current position to the pos-file. You can also save some other position, previosly obtained with C<position()>.
+
+Pos-file gets commited using a temporary file, so it won't be lost if disk space is depleted.
 
 =cut
 sub commit($;$)
@@ -484,7 +495,9 @@ sub commit($;$)
 
 =item B<< lag() >>
 
-Get the lag between current position and the end of the log in bytes.
+Get the size of data remaining to be read, in bytes.
+
+It takes all log files into account, so if you're in the middle of I<foo.log.1>, it will return the size of remaining data in it, plus the size of I<foo.log> (if it exists).
 
 =cut
 sub lag ($)
@@ -508,7 +521,7 @@ sub lag ($)
 
 =item B<< log_number() >>
 
-Get current log number.
+Get the current log's number.
 
 =cut
 sub log_number {
@@ -518,7 +531,7 @@ sub log_number {
 
 =item B<< log_name() >>
 
-Get current log name. Doesn't contain C<< .N >> postfix even if cursor points to old log file.
+Get the log's name. Doesn't contain C<< .N >> postfix even if cursor points to old log file.
 
 =cut
 sub log_name {
@@ -532,25 +545,27 @@ sub log_name {
 
 To find and open correct log is a race-condition-prone task.
 
-This module was used in production environment for 3 years, and many bugs were found and fixed. The only known case when position file can become broken is when logrotate is invoked twice in *very* short amount of time, which should never be a case.
+This module was used in production environment for many years, and many bugs were found and fixed. The only known case when position file can become broken is when logrotate is invoked twice in *very* short amount of time, which should never be a case.
 
-Don't set I<check_inode> option on virtual hosts, especially on openvz-based ones. When host migrates, inodes of files will change and your position file will become broken.
+Don't set the I<check_inode> option on virtual hosts, especially on openvz-based ones. If you move your data, inodes of files will change and your position file will become broken. In fact, don't set I<check_inode> at all, it's deprecated.
 
-The logrotate config should not use the "compress" option to make that module function properly. If you need to compress logs, set "delaycompress" option too.
+The logrotate config should not use the C<compress> option to make that module function properly. If you need to compress logs, set C<delaycompress> option too.
+
+This module expects the logs to be named I<foo.log>, I<foo.log.1>, I<foo.log.2>, etc. Skipping some numbers in the sequence is ok, but postfixes should be *positive integers* to be properly sorted. If you use some other naming scheme, for example, I<foo.log.20130604-140500>, you're out of luck. Patches welcome!
 
 =head1 AUTHORS
 
-Andrei Mishchenko C<druxa@yandex-team.ru>, Vyacheslav Matjukhin C<mmcleric@yandex-team.ru>.
+Andrei Mishchenko C<druxa@yandex-team.ru>, Vyacheslav Matjukhin C<me@berekuk.ru>.
 
 =head1 SEE ALSO
 
 L<File::LogReader> - another implementation of the same idea.
 
-L<unrotate(1)> - console script to unrotate logs.
+L<unrotate> - console script for reading logs.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006-2010 Yandex LTD. All rights reserved.
+Copyright (c) 2006-2013 Yandex LTD. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 

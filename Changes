@@ -1,6 +1,7 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+        * improve perldocs
 
 1.29    Tue May 07, 2013
         * speed up read() by 30% by inlining the $getline->() call
