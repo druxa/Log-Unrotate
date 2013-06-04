@@ -1,6 +1,8 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+
+1.30    Wed Jun 05, 2013
         * improve perldocs
 
 1.29    Tue May 07, 2013
