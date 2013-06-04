@@ -40,7 +40,7 @@ our %_text2field = (
 
 =item B<new($file)>
 
-Construct the cursor from the file.
+Construct a cursor from the file.
 
 C<$options> is an optional hashref.
 

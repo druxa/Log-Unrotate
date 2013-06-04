@@ -76,7 +76,7 @@ our %_end_values = map { $_ => 1 } qw(fixed future);
 
 =item B<< new($params) >>
 
-Creates the new unrotate object.
+Creates a new unrotate object.
 
 =over
 
