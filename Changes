@@ -1,6 +1,7 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+        * fix perldoc syntax (fix tests)
 
 1.30    Wed Jun 05, 2013
         * improve perldocs

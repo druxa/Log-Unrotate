@@ -228,4 +228,8 @@ sub DESTROY {
     }
 }
 
+=back
+
+=cut
+
 1;
