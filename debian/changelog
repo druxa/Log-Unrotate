@@ -1,3 +1,9 @@
+liblog-unrotate-perl (1.31) unstable; urgency=low
+
+  * 1.31 debian release
+
+ -- Andrei Mishchenko <druxa@yandex-team.ru>  Thu, 13 Jun 2013 17:42:00 +0400
+
 liblog-unrotate-perl (1.29) unstable; urgency=low
 
   * speed up read() by 30%
