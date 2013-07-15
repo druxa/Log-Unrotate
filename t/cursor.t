@@ -9,11 +9,13 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Test::More tests => 115;
+use Perl6::Slurp;
+use Test::More tests => 119;
 use Test::NoWarnings;
 use t::Utils;
 
 my $time = time;
+my $posfile = 'tfiles/cursor.pos';
 
 BEGIN {
     *CORE::GLOBAL::time = sub() { return $time };
@@ -23,7 +25,7 @@ BEGIN {
 sub cursor (;$) {
     my ($opts) = @_;
     $opts ||= {};
-    my $file = delete $opts->{file} || 'tfiles/cursor.pos';
+    my $file = delete $opts->{file} || $posfile;
     my $no_clean = delete $opts->{no_clean};
 
     unlink $file unless $no_clean;
@@ -55,6 +57,34 @@ sub fields {
 }
 
 # locks are tested in t/new.t
+
+# do not write same position no matter what the commit time is
+{
+    my $c = cursor({rollback_period => 3});
+    my $time = time;
+
+    my $def_pos = default_pos({Position => 100, CommitTime => $time});
+    $c->commit($def_pos);
+    my @posfile = slurp($posfile);
+    is (scalar(@posfile), 5, '1 position written');
+    my $ls = `ls -lh $posfile`;
+    sleep(1);
+
+    $def_pos = default_pos({Position => 100, CommitTime => $time});
+    $c->commit($def_pos);
+    my $new_ls = `ls -lh $posfile`;
+    is ($new_ls, $ls, 'file was not changed');
+
+    $def_pos = default_pos({Position => 100, CommitTime => $time + 1});
+    $c->commit($def_pos);
+    $new_ls = `ls -lh $posfile`;
+    is ($new_ls, $ls, 'file was not changed');
+
+    $def_pos = default_pos({Position => 101, CommitTime => $time + 1});
+    $c->commit($def_pos);
+    @posfile = slurp($posfile);
+    is (scalar(@posfile), 11, 'finally changed');
+}
 
 # read empty (2)
 {
@@ -426,4 +456,3 @@ sub fields {
     is($res, 0, "Rollback failed");
     is($c11->read()->{Position}, 0, "c11 Position after failed rollback");
 }
-
