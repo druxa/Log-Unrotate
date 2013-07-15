@@ -10,6 +10,7 @@ use warnings;
 use lib qw(lib);
 
 use Perl6::Slurp;
+use File::stat;
 use Test::More tests => 119;
 use Test::NoWarnings;
 use t::Utils;
@@ -67,18 +68,21 @@ sub fields {
     $c->commit($def_pos);
     my @posfile = slurp($posfile);
     is (scalar(@posfile), 5, '1 position written');
-    my $ls = `ls -lh $posfile`;
+    my $st = stat($posfile) || die "Cannot take stat $posfile!";
+    my $mtime = $st->mtime;
     sleep(1);
 
     $def_pos = default_pos({Position => 100, CommitTime => $time});
     $c->commit($def_pos);
-    my $new_ls = `ls -lh $posfile`;
-    is ($new_ls, $ls, 'file was not changed');
+    $st = stat($posfile) || die "Cannot take stat $posfile!";
+    my $new_mtime = $st->mtime;
+    is ($new_mtime, $mtime, 'file was not changed');
 
     $def_pos = default_pos({Position => 100, CommitTime => $time + 1});
     $c->commit($def_pos);
-    $new_ls = `ls -lh $posfile`;
-    is ($new_ls, $ls, 'file was not changed');
+    $st = stat($posfile) || die "Cannot take stat $posfile!";
+    $new_mtime = $st->mtime;
+    is ($new_mtime, $mtime, 'file was not changed');
 
     $def_pos = default_pos({Position => 101, CommitTime => $time + 1});
     $c->commit($def_pos);
