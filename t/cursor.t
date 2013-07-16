@@ -9,9 +9,8 @@ use strict;
 use warnings;
 use lib qw(lib);
 
-use Perl6::Slurp;
 use File::stat;
-use Test::More tests => 119;
+use Test::More tests => 122;
 use Test::NoWarnings;
 use t::Utils;
 
@@ -64,21 +63,22 @@ sub fields {
     my $c = cursor({rollback_period => 3});
     my $time = time;
 
-    my $def_pos = default_pos({Position => 100, CommitTime => $time});
+    my $def_pos = default_pos({CommitTime => $time});
     $c->commit($def_pos);
-    my @posfile = slurp($posfile);
-    is (scalar(@posfile), 5, '1 position written');
+    is (defined($c->read), 1, 'position written');
+    is ($c->rollback, 0, 'cannot rollback - was just one position');
     my $st = stat($posfile) || die "Cannot take stat $posfile!";
     my $mtime = $st->mtime;
     sleep(1);
 
-    $def_pos = default_pos({Position => 100, CommitTime => $time});
+    $def_pos = default_pos({CommitTime => $time});
     $c->commit($def_pos);
+    is ($c->rollback, 0, 'cannot rollback - just one position still');
     $st = stat($posfile) || die "Cannot take stat $posfile!";
     my $new_mtime = $st->mtime;
     is ($new_mtime, $mtime, 'file was not changed');
 
-    $def_pos = default_pos({Position => 100, CommitTime => $time + 1});
+    $def_pos = default_pos({CommitTime => $time + 1});
     $c->commit($def_pos);
     $st = stat($posfile) || die "Cannot take stat $posfile!";
     $new_mtime = $st->mtime;
@@ -86,8 +86,9 @@ sub fields {
 
     $def_pos = default_pos({Position => 101, CommitTime => $time + 1});
     $c->commit($def_pos);
-    @posfile = slurp($posfile);
-    is (scalar(@posfile), 11, 'finally changed');
+    my $read_pos = $c->read;
+    is ($read_pos->{Position}, 101, 'position written');
+    is ($c->rollback, 1, 'rollback OK - finally changed');
 }
 
 # read empty (2)
