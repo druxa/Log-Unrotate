@@ -1,3 +1,9 @@
+liblog-unrotate-perl (1.32) unstable; urgency=low
+
+  * do not write same position to pos history 
+
+ -- Andrei Mishchenko <druxa@yandex-team.ru>  Wed, 17 Jul 2013 15:40:12 +0400
+
 liblog-unrotate-perl (1.31) unstable; urgency=low
 
   * 1.31 debian release

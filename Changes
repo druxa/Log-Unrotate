@@ -1,6 +1,7 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+        * do not write same position to pos history
 
 1.31    Thu Jun 06, 2013
         * fix perldoc syntax (fix tests)
