@@ -182,6 +182,10 @@ sub _commit_with_backups($$) {
         return;
     }
 
+    if ($poss->[0]->{Position} == $pos->{Position} && $poss->[0]->{LastLine} eq $pos->{LastLine} && $poss->[0]->{Inode} == $pos->{Inode}) {
+        return; # same position! do not write anything!
+    }
+
     my @times = map { $time - ($_->{CommitTime} || $time) } @$poss;
     my @new_poss = ();
     if ($times[0] > $self->{rollback} || scalar @times == 1) {
