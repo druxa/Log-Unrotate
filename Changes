@@ -1,6 +1,7 @@
 Revision history for Log-Unrotate
 
 {{$NEXT}}
+        * get rid of warnings in positions compares
 
 1.32    Wed Jul 17, 2013
         * do not write same position to pos history
