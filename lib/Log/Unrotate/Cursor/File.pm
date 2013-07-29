@@ -182,12 +182,12 @@ sub _commit_with_backups($$) {
         return;
     }
 
-    sub is_eq {
+    sub _is_eq {
         my ($one, $two) = @_;
         return (defined($one) && defined($two) && $one eq $two) || (!defined($one) && !defined($two));
     }
 
-    if ($poss->[0]->{Position} == $pos->{Position} && is_eq($poss->[0]->{LastLine}, $pos->{LastLine}) && is_eq($poss->[0]->{Inode}, $pos->{Inode})) {
+    if ($poss->[0]->{Position} == $pos->{Position} && _is_eq($poss->[0]->{LastLine}, $pos->{LastLine}) && _is_eq($poss->[0]->{Inode}, $pos->{Inode})) {
         return; # same position! do not write anything!
     }
 
