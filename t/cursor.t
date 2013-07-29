@@ -89,6 +89,9 @@ sub fields {
     my $read_pos = $c->read;
     is ($read_pos->{Position}, 101, 'position written');
     is ($c->rollback, 1, 'rollback OK - finally changed');
+
+    $def_pos = {Position => 100, LogFile => 'tfiles/log.log'};
+    $c->commit($def_pos); # must throw no warnings
 }
 
 # read empty (2)
